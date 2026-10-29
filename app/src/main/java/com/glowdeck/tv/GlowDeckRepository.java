@@ -47,8 +47,6 @@ final class GlowDeckRepository {
         legacy.edit().putString("custom_groups_v12", json).apply();
     }
 
-<<<<<<< HEAD
-=======
     List<SegmentZone> loadZones() {
         List<SegmentZone> result = new ArrayList<>();
         try {
@@ -70,7 +68,6 @@ final class GlowDeckRepository {
         shared.edit().putString("zones_v17",output.toString()).apply();
     }
 
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
     List<GlowScene> loadScenes() {
         List<GlowScene> scenes = new ArrayList<>();
         Set<String> ids = new HashSet<>();

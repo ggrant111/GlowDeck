@@ -12,10 +12,7 @@ final class ActionDispatcher {
     static final class Result {
         int successful;
         int unsupported;
-<<<<<<< HEAD
-=======
         int unconfirmed;
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
         final List<String> errors = new ArrayList<>();
     }
     private ActionDispatcher() {}
@@ -28,12 +25,9 @@ final class ActionDispatcher {
                 if (patch == null) { result.unsupported++; continue; }
                 sender.send(d.host, patch);
                 result.successful++;
-<<<<<<< HEAD
-=======
             } catch (WledCommandVerifier.UnconfirmedException error) {
                 result.unconfirmed++;
                 result.errors.add(d.name() + ": request sent but not confirmed: " + error.getMessage());
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
             } catch (Exception error) {
                 result.errors.add(d.name() + ": " + (error.getMessage() == null ? "network error" : error.getMessage()));
             }
@@ -51,18 +45,6 @@ final class ActionDispatcher {
                 return result.put("on", true).put("bri", favorite.value);
             case Favorite.COLOR: {
                 int rgb = favorite.value;
-<<<<<<< HEAD
-                JSONArray color = new JSONArray()
-                        .put((rgb >> 16) & 255).put((rgb >> 8) & 255).put(rgb & 255);
-                JSONObject change = new JSONObject().put("fx", 0)
-                        .put("col", new JSONArray().put(color));
-                // Use full segment array when known, including non-selected segments.
-                JSONArray segments = new JSONArray();
-                for (WledDevice.Segment segment : d.segments)
-                    segments.put(new JSONObject(change.toString()).put("id", segment.id));
-                return result.put("on", true)
-                        .put("seg", segments.length() > 0 ? segments : change);
-=======
                 // Like dashboard swatches, Favorites edit primary Fx color without resetting
                 // the current effect or overwriting secondary/tertiary RGB(W) colors.
                 JSONArray segments = new JSONArray();
@@ -74,7 +56,6 @@ final class ActionDispatcher {
                 if (segments.length() == 0 && !d.segments.isEmpty()) return null;
                 return result.put("on", true).put("seg", segments.length() > 0 ? segments :
                         new JSONObject().put("col", WledEffectColors.withSlot(null, 0, rgb)));
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
             }
             case Favorite.PRESET: {
                 int preset = -1;

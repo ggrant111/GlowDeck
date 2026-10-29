@@ -145,17 +145,6 @@ final class GlowScene {
                     .put("on", true).put("bri", Math.max(1, Math.min(255, bri)));
             return new Target(deviceId, lastHost, name, updated);
         }
-<<<<<<< HEAD
-        Target withColor(int rgb) throws JSONException {
-            JSONObject updated = new JSONObject(state.toString()).put("on", true);
-            JSONArray seg = updated.optJSONArray("seg");
-            if (seg == null || seg.length() == 0) seg = new JSONArray().put(new JSONObject().put("id", 0));
-            JSONArray col = new JSONArray().put(new JSONArray()
-                    .put((rgb >> 16) & 255).put((rgb >> 8) & 255).put(rgb & 255));
-            for (int i = 0; i < seg.length(); i++) {
-                JSONObject part = seg.getJSONObject(i);
-                part.put("on", true).put("fx", 0).put("fxName", "Solid").put("col", col);
-=======
         Target withColor(int rgb) throws JSONException { return withColor(0, rgb); }
 
         /** Change only one saved color slot; keep fx/fxName, palette and other slots unchanged. */
@@ -167,7 +156,6 @@ final class GlowScene {
             for (int i = 0; i < seg.length(); i++) {
                 JSONObject part = seg.getJSONObject(i);
                 part.put("on", true).put("col", WledEffectColors.withSlot(part.optJSONArray("col"), slot, rgb));
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
             }
             updated.put("seg", seg);
             return new Target(deviceId, lastHost, name, updated);

@@ -21,12 +21,9 @@ final class WledDevice {
     int intensity = 128;
     int currentPreset = -1;
     int rgb = 0xFFFFA75F;
-<<<<<<< HEAD
-=======
     final List<String> effectMetadata = new ArrayList<>();
     boolean loadedEffectMetadata = false;
     boolean loadingEffectMetadata = false;
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
     int ledCount = 0;
     final List<Segment> segments = new ArrayList<>();
     final List<String> effects = new ArrayList<>();
@@ -74,14 +71,10 @@ final class WledDevice {
                 if (s == null) continue;
                 int id = s.optInt("id", i);
                 if (s.optInt("stop", 1) <= s.optInt("start", 0)) continue;
-<<<<<<< HEAD
-                segments.add(new Segment(id, s.optString("n", ""), s.optBoolean("on", true)));
-=======
                 segments.add(new Segment(id, s.optString("n", ""), s.optBoolean("on", true),
                         s.optInt("fx", 0), WledEffectColors.copy(s.optJSONArray("col")),
                         s.optInt("start",0),s.optInt("stop",0),s.optInt("bri",255),
                         s.optInt("pal",0),s.optBoolean("rev",false)));
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
             }
             JSONObject chosen = null;
             for (int i = 0; i < seg.length(); i++) {
@@ -115,8 +108,6 @@ final class WledDevice {
         }
     }
 
-<<<<<<< HEAD
-=======
     /** Metadata indexes are identical to WLED effects[] indexes. */
     void applyEffectMetadata(JSONArray metadata) {
         effectMetadata.clear();
@@ -136,7 +127,6 @@ final class WledDevice {
         return segments.isEmpty() ? null : segments.get(0);
     }
 
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
     void applyPresets(JSONObject data) {
         loadedPresets = true;
         loadingPresets = false;
@@ -153,9 +143,6 @@ final class WledDevice {
         final int id;
         final String name;
         final boolean on;
-<<<<<<< HEAD
-        Segment(int id, String name, boolean on) { this.id = id; this.name = name; this.on = on; }
-=======
         final int start, stop, brightness, palette;
         final boolean reverse;
         final int effect;
@@ -172,7 +159,6 @@ final class WledDevice {
             this.effect = effect;
             this.colors = colors;
         }
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
         String label() { return name.isEmpty() ? "Segment " + (id + 1) : name; }
     }
 

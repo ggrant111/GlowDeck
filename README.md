@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 # GlowDeck v1.7.2 — Built-in Live Effects Engine
 
 Android application **1.7.2**, versionCode **14**, app package `com.glowdeck.tv`.
@@ -99,7 +97,6 @@ Version 1.6.1 (versionCode 9). This release resolves a crash that affected some 
 
 ---
 
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
 # GlowDeck v1.5 — Favorites & Shortcuts
 
 **Version:** 1.5.0 (Android application ID `com.glowdeck.tv`, versionCode 7). One APK for Fire TV, Android tablets, and phones.

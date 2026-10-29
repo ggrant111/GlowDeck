@@ -1,7 +1,5 @@
 # Change log
 
-<<<<<<< HEAD
-=======
 ## v1.7.2 — Native Live Effects Engine
 - Five standalone UDP-streamed effects: Chase/Comet, Color Wipe, Rainbow Flow, Pulse/Breathe, Sparkle.
 - Live Android controls for effect, primary/secondary color, speed, and brightness on saved physical segments and cross-device zones.
@@ -57,7 +55,6 @@
 - Add reproducible Fire Tablet ADB verification instructions.
 
 
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
 ## v1.6.0 — Multi-Device Scene Builder
 - Create independent GlowDeck scenes by capturing actual WLED states from selected controllers.
 - Edit each scene light offline: on/off, brightness, colors, effects, re-capture, add/remove controllers.

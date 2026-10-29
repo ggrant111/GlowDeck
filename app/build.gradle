@@ -10,13 +10,8 @@ android {
         applicationId 'com.glowdeck.tv'
         minSdk 23
         targetSdk 32 // Fire TV sideload compatibility; review before any store release.
-<<<<<<< HEAD
-        versionCode 8
-        versionName '1.6.0'
-=======
         versionCode 14
         versionName '1.7.2'
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
     }
 
     compileOptions {

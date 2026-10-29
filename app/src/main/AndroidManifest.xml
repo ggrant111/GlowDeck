@@ -17,10 +17,7 @@
         android:theme="@style/GlowDeckTheme"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
-<<<<<<< HEAD
-=======
         <activity android:name=".SegmentStudioActivity" android:exported="false" />
->>>>>>> 62916f5714b46463127f168628eceeae27726df4
         <activity
             android:name=".MainActivity"
             android:exported="true"
