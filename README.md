@@ -1,3 +1,105 @@
+<<<<<<< HEAD
+=======
+# GlowDeck v1.7.2 — Built-in Live Effects Engine
+
+Android application **1.7.2**, versionCode **14**, app package `com.glowdeck.tv`.
+One APK for Fire TV, Amazon Fire tablets, and Android phones; all UDP runs **directly from the device running GlowDeck** and never requires a computer or cloud server.
+
+## Get started
+
+1. Connect the Android device and your WLED controllers to the same LAN, allowing local UDP.
+2. Open **Segment Studio**. Choose a device segment → **Live Effects (streamed)**, or open **Multi-device Zones** → **Live Effects** for a saved zone.
+3. Select **Chase / Comet, Color Wipe, Rainbow Flow, Pulse / Breathe, or Sparkle**. Choose primary and secondary color, speed, and brightness.
+4. Press **Start streaming**. The app generates frames locally and sends them directly to the selected ranges via WLED's DNRGB realtime UDP protocol. You can change effects, colors, speed, and brightness while running.
+5. Press **Stop & restore**, close the control dialog or leave the app to stop. A **90-second automatic cutoff** limits unattended streaming; the prior WLED logical state is restored on a best-effort basis.
+
+## Critical caveats
+
+- WLED realtime packets may temporarily **override or black out other LEDs on the same controller**, even if you select only a portion of that strip. WLED's typical realtime receiver takes control of the LED output, and segment-isolated continuous streaming is not guaranteed.
+- Packets use UDP and carry **no delivery acknowledgments**. Packet counts report data sent by Android, not confirmed LED output. Effects will not continue after GlowDeck exits.
+- The renderer runs at a conservative ~15 FPS, capped at 4096 LEDs/controller and 90 seconds/session. Controllers with a different realtime UDP port use `info.udpport` when available.
+- The app refuses to overwrite an active outside realtime sender. GlowDeck captures recovery snapshots before streaming and attempts to restore after the 2-second UDP timeout; network failures or force-close may delay recovery. Reopen Segment Studio and use **UDP status / Restore pending lighting** if necessary.
+- The first five live effects animate **each selected range separately**, even when multiple devices share a zone. Seamless single-canvas cross-controller animations are intended for v1.7.3.
+- WLED's built-in effects remain the best option for autonomous lighting that must run when the Android app closes.
+
+**Tests:** JVM coverage for all five algorithms, absolute pixel offsets, deterministic frames, brightness, and packet boundaries, plus existing segment/scene/Favorites tests. See `docs/V1_7_2_LIVE_EFFECTS_ACCEPTANCE.md`. Automated Android builds cannot substitute for actual WLED hardware tests.
+
+---
+
+# GlowDeck v1.7.1 — Live UDP Segment Identifier and DDP Test
+
+Android app version **1.7.1** (`versionCode 13`, package `com.glowdeck.tv`). This is the first UDP streaming milestone, without a separate server.
+
+## Use
+
+1. Connect the Fire tablet, phone, or Fire TV and WLED controllers to a reachable local Wi-Fi network.
+2. Open **Segment Studio → Devices & Segments**. Select a physical segment → **Live UDP identify / chase**; or select a **Multi-device Zone → Live UDP identification**. Choose **Solid**, **Chase**, or **Show start/end**.
+3. When editing a numeric LED range, select **Live UDP: Chase / Show ends / Solid** to preview the chosen range (it must be inside an existing physical WLED segment).
+4. To test DDP, select **Test DDP on entire strip** for an individual controller and explicitly confirm the warning. The temporary rainbow animation takes over the whole strip, not only the selected segment.
+5. Stop using the visible button or let the session expire after 12 seconds. GlowDeck waits for WLED realtime to release, then attempts to restore previous effects and brightness. A recovery snapshot is saved before any UDP packet is sent.
+
+## Networking and limitations
+
+- WLED **DNRGB realtime UDP**: default port **21324** (configurable within WLED itself). DNRGB uses absolute 16-bit pixel indexes and 2-second UDP realtime timeout. Preview frames run at 8 FPS; the app sends only to explicitly chosen controllers and ranges. It does not work over WAN or through networks that block client-to-client UDP.
+- **DDP**: unicast port **4048**; RGB24 packets have up to 480 pixels each with byte offsets and PUSH on the final packet. Test frames run at 10 FPS and control the **entire** controller output.
+- WLED realtime typically interrupts/clears other effects on the controller. **Selected segment preview does not guarantee unaffected LEDs will continue animating.** No per-packet delivery acknowledgment is available.
+- The app must stay open; if Android pauses Segment Studio, GlowDeck stops the sender and tries restoring lights. Sudden termination can delay recovery; the app retries any recorded recovery at next start.
+- Preview is limited to 4096 LEDs per controller and 12 seconds to avoid overwhelming older Fire OS devices. DNRGB addresses are limited to 16-bit LED coordinates.
+- If another realtime sender is already active (`info.live`), the app refuses to take over. Stop the other sender first.
+- **No full custom Live Effects engine or background streaming** is included in v1.7.1; that is the planned v1.7.2 milestone.
+
+See `docs/V1_7_1_UDP_ACCEPTANCE.md` for tests on real WLED hardware. Install in-place using the same signing key to preserve saved configuration.
+
+---
+
+# GlowDeck v1.7.0 — Segment Studio & multi-device zones
+
+**Android versionCode 12.** Create and control individual physical WLED segments, identify LED ranges visually, and combine segments across controllers into a GlowDeck zone. TV and tablet users open **Segments**; phone users open **More → Segment Studio**. See [documentation](docs/V1_7_SEGMENT_STUDIO.md).
+
+Device/zone storage remains local. No cloud sync or Android home widgets have been added yet. Physical-device tests are required.
+
+---
+
+# GlowDeck v1.6.3 — Effect-aware color slots
+
+**Version 1.6.3 (versionCode 11).** Fixes the WLED effect-color workflow: choosing any color no longer switches your chosen effect to Solid. Select separate Fx (primary), Bg (background), or Cs (tertiary) pickers where the WLED effect supports them, then adjust using quick colors or a custom RGB picker. You can change each slot independently while keeping its other colors and RGBW white values.
+
+**WLED integration:** Reads metadata from `GET /json/fxdata` for WLED 0.14+ and parses the second semicolon-separated section to determine active color slots. Older WLED devices use legacy three-color controls. Color updates send only `on` and `seg[].col` to `POST /json/state` (no `fx` or palette changes). A palette-driven effect may not visibly respond to manual color slots even though the WLED controller confirms the stored setting; change palette if needed.
+
+**Scene editing:** Color edits to saved scenes now preserve effects; no live lighting changes until Play. Full-color RGB edit and quick swatches work with separate slots.
+
+**Feedback:** v1.6.2 command sent/confirmed banners remain in effect; all requests are verified against the controller's reported state.
+
+**Testing:** See `docs/V1_6_3_COLOR_TESTS.md`. Automatic CI builds/unit tests don't replace Fire OS hardware testing.
+
+---
+
+# GlowDeck v1.6.2 — Verified Command Feedback
+
+One Android APK supports Fire TV, tablets and phones (`com.glowdeck.tv`, versionCode 10).
+
+## Status notifications
+Whenever GlowDeck changes WLED state via a control, Favorite, WLED preset, or saved multi-device scene, a nonblocking banner appears instantly. It shows **Request queued**, then **Request sent · checking WLED state**, then **Confirmed**, **Not confirmed**, or **Failed**. For groups, GlowDeck reports how many controllers were confirmed. This confirmation is based on independent `GET /json` reads after `POST /json/state`, not the HTTP send result. Saved preset creation is checked by reading `/presets.json`.
+
+A timeout does not mean the command failed: if the reported WLED state has not caught up after the verification window, GlowDeck reports **not confirmed** rather than making a false success claim. Physical light output (e.g. visually observed color) cannot be certified by the WLED API; confirmation means the controller *reports* the requested state.
+
+No changes to saved devices, groups, scenes, favorites, or WLED network settings; v1.6.1's Fire Tablet startup fix remains included.
+
+Build: `gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35). See the GitHub Actions build artifact.
+
+---
+
+# GlowDeck v1.6.1 — Fire Tablet compatibility hotfix
+
+Version 1.6.1 (versionCode 9). This release resolves a crash that affected some older Amazon Fire tablets when creating the brightness slider. `MainActivity.touchSeek` no longer calls the unavailable `SeekBar.setMinHeight(int)` method; the slider still receives a 48dp height through its layout parameters.
+
+**Upgrade:** Install over the existing GlowDeck app using the same signing certificate to retain devices, groups, favorites, and scenes. Don't uninstall just to fix the crash. If Android reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the signing certificate is different; preserve or back up your configuration before choosing to uninstall.
+
+**Test on Fire Tablet:** `adb logcat -c`, install and launch, then `adb logcat -d -b crash -v time`. See [Fire Tablet compatibility test](docs/FIRE_TABLET_COMPATIBILITY.md). GitHub Actions compiles and runs JVM tests but physical Fire OS confirmation is still required.
+
+---
+
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
 # GlowDeck v1.5 — Favorites & Shortcuts
 
 **Version:** 1.5.0 (Android application ID `com.glowdeck.tv`, versionCode 7). One APK for Fire TV, Android tablets, and phones.

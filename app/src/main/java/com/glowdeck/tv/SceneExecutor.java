@@ -15,12 +15,23 @@ final class SceneExecutor {
         int succeeded;
         int missing;
         int failed;
+<<<<<<< HEAD
         int skippedSegments;
         final List<String> problems = new ArrayList<>();
         String summary(int total) {
             return succeeded + "/" + total + " lights updated" +
                     (missing > 0 ? " · " + missing + " missing" : "") +
                     (failed > 0 ? " · " + failed + " failed" : "") +
+=======
+        int unconfirmed;
+        int skippedSegments;
+        final List<String> problems = new ArrayList<>();
+        String summary(int total) {
+            return succeeded + "/" + total + " lights confirmed" +
+                    (missing > 0 ? " · " + missing + " missing" : "") +
+                    (failed > 0 ? " · " + failed + " failed" : "") +
+                    (unconfirmed > 0 ? " · " + unconfirmed + " not confirmed" : "") +
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                     (skippedSegments > 0 ? " · " + skippedSegments + " unsupported segments/effects" : "");
         }
     }
@@ -49,6 +60,12 @@ final class SceneExecutor {
                 result.succeeded++;
                 result.skippedSegments += skipped[0];
                 if (skipped[0] > 0) result.problems.add(target.name + ": " + skipped[0] + " segments/effects unavailable");
+<<<<<<< HEAD
+=======
+            } catch (WledCommandVerifier.UnconfirmedException ex) {
+                result.unconfirmed++;
+                result.problems.add(target.name + ": request sent but not confirmed (" + ex.getMessage() + ")");
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             } catch (Exception ex) {
                 result.failed++;
                 result.problems.add(target.name + ": " + (ex.getMessage() == null ? "request failed" : ex.getMessage()));

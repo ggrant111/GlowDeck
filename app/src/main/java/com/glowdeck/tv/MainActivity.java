@@ -79,8 +79,20 @@ public class MainActivity extends Activity {
     private final ExecutorService discoveryWork = Executors.newSingleThreadExecutor();
     private final List<WledDevice> devices = new ArrayList<>(); // Main thread only.
     private String selectedHost = ""; // "*" targets every configured device.
+<<<<<<< HEAD
     private int selectedSegment = -1; // -1 = all segments, per-device segments otherwise.
     private String message = "Ready";
+=======
+    private int selectedColorSlot = 0; // Current WLED Fx/Bg/Cs picker slot.
+    private int selectedSegment = -1; // -1 = all segments, per-device segments otherwise.
+    private String message = "Ready";
+    private long commandSequence = 0L;
+    private FrameLayout commandBanner;
+    private Runnable dismissCommandBanner;
+    private String bannerText = "";
+    private int bannerColor = ACCENT;
+    private boolean bannerPending = false;
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     private boolean running = false;
     private boolean scanning = false;
     private FrameLayout rootFrame;
@@ -169,8 +181,15 @@ public class MainActivity extends Activity {
     }
 
     private void buildCurrentShell() {
+<<<<<<< HEAD
         if (tvMode) buildShell();
         else buildTouchShell();
+=======
+        commandBanner = null;
+        if (tvMode) buildShell();
+        else buildTouchShell();
+        if (!bannerText.isEmpty()) showBanner(bannerText, bannerColor, bannerPending);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     }
 
     @Override public void onConfigurationChanged(Configuration newConfig) {
@@ -208,6 +227,10 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+<<<<<<< HEAD
+=======
+        if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         network.shutdownNow();
         discoveryWork.shutdownNow();
         super.onDestroy();
@@ -313,7 +336,11 @@ public class MainActivity extends Activity {
         navList.removeAllViews();
         String[][] entries = {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
+<<<<<<< HEAD
                 {"scenes", "Scenes"}, {"effects", "Effects"}, {"presets", "Presets"},
+=======
+                {"scenes", "Scenes"}, {"segments", "Segments"}, {"effects", "Effects"}, {"presets", "Presets"},
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                 {"settings", "Settings"}
         };
         for (String[] entry : entries) {
@@ -335,11 +362,20 @@ public class MainActivity extends Activity {
             item.addView(label, sized(-1, 18));
             item.setOnClickListener(v -> {
                 if (entry[0].equals("home")) closeDrawer();
+<<<<<<< HEAD
                 else openDrawer(entry[0]);
             });
             setRailFocus(item, active);
             navList.addView(item, sized(-1, 53));
             navList.addView(space(1, 5));
+=======
+                else if (entry[0].equals("segments")) openSegmentStudio();
+                else openDrawer(entry[0]);
+            });
+            setRailFocus(item, active);
+            navList.addView(item, sized(-1, 48));
+            navList.addView(space(1, 3));
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         }
     }
 
@@ -395,6 +431,14 @@ public class MainActivity extends Activity {
                     }
                     star.close(); c.drawPath(star, pen); break;
                 }
+<<<<<<< HEAD
+=======
+                case "segments": {
+                    for (int i=0;i<3;i++) c.drawRoundRect(-12+i*8,-10, -6+i*8,10,2,2,pen);
+                    c.drawLine(-12,-13,12,-13,pen);c.drawLine(-12,13,12,13,pen);
+                    break;
+                }
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                 case "scenes": {
                     for (int row = 0; row < 2; row++) for (int col = 0; col < 2; col++) {
                         float x = -10 + col * 12, y = -10 + row * 12;
@@ -518,7 +562,11 @@ public class MainActivity extends Activity {
         } : new String[][] {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
                 {"scenes", "Scenes"}, {"effects", "Effects"},
+<<<<<<< HEAD
                 {"presets", "Presets"}, {"groups", "Groups"}, {"settings", "More"}
+=======
+                {"presets", "Presets"}, {"segments", "Segments"}, {"settings", "More"}
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         };
         for (String[] entry : items) {
             boolean active = activeDrawer.equals(entry[0]) ||
@@ -540,6 +588,10 @@ public class MainActivity extends Activity {
             item.setOnClickListener(v -> {
                 if ("home".equals(entry[0])) { if (drawerOverlay != null) dismissAllDrawers();
                     if (touchScroll != null) touchScroll.smoothScrollTo(0, 0); }
+<<<<<<< HEAD
+=======
+                else if (entry[0].equals("segments")) openSegmentStudio();
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                 else openDrawer(entry[0]);
             });
             setRailFocus(item, active);
@@ -868,6 +920,7 @@ public class MainActivity extends Activity {
                                         catch (JSONException e) { toast("Could not update scene"); }
                                     }).setNegativeButton("Cancel", null).show();
                         }
+<<<<<<< HEAD
                         if (which == 3) new AlertDialog.Builder(this)
                                 .setTitle(t.name + " color")
                                 .setItems(COLOR_NAMES, (d, i) -> {
@@ -875,6 +928,9 @@ public class MainActivity extends Activity {
                                             t.withColor(COLOR_VALUES[i] & 0xFFFFFF)); }
                                     catch (JSONException e) { toast("Could not update scene"); }
                                 }).setNegativeButton("Cancel", null).show();
+=======
+                        if (which == 3) chooseSceneColorSlot(scene, index, t);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                         if (which == 4) {
                             WledDevice device = SceneExecutor.findDevice(t, devices);
                             if (device == null || device.effects.isEmpty()) {
@@ -904,6 +960,50 @@ public class MainActivity extends Activity {
                 }).setNegativeButton("Close", null).show();
     }
 
+<<<<<<< HEAD
+=======
+    private void chooseSceneColorSlot(GlowScene scene, int index, GlowScene.Target target) {
+        WledDevice device = SceneExecutor.findDevice(target, devices);
+        JSONObject part = target.state.optJSONArray("seg") == null ? null :
+                target.state.optJSONArray("seg").optJSONObject(0);
+        int effect = part == null ? 0 : part.optInt("fx", -1);
+        if (device != null && part != null && part.has("fxName"))
+            effect = indexByName(device.effects, part.optString("fxName", ""));
+        String[] labels = WledEffectColors.labels(device == null ? null : device.metadataForEffect(effect));
+        List<Integer> slots = new ArrayList<>();
+        List<String> options = new ArrayList<>();
+        for (int i = 0; i < 3; i++) if (labels[i] != null) {
+            slots.add(i);
+            options.add(labels[i] + " color");
+        }
+        if (slots.isEmpty()) { toast("This effect doesn't use manual colors"); return; }
+        new AlertDialog.Builder(this).setTitle("Scene colors · " + target.name)
+                .setItems(options.toArray(new String[0]), (dialog, which) -> {
+                    int slot = slots.get(which);
+                    String[] choices = java.util.Arrays.copyOf(COLOR_NAMES, COLOR_NAMES.length + 1);
+                    choices[COLOR_NAMES.length] = "Custom RGB color…";
+                    new AlertDialog.Builder(this).setTitle(labels[slot] + " · " + target.name)
+                            .setItems(choices, (d, picked) -> {
+                                if (picked == COLOR_NAMES.length) {
+                                    // The same color picker edits the saved scene, not the live lights.
+                                    JSONObject savedPart = target.state.optJSONArray("seg") == null ? null :
+                                            target.state.optJSONArray("seg").optJSONObject(0);
+                                    int savedColor = WledEffectColors.rgb(
+                                            savedPart == null ? null : savedPart.optJSONArray("col"), slot);
+                                    showColorPicker(slot, savedColor, labels,
+                                            (slotIndex, rgb) -> saveSceneSlotColor(scene, index, slotIndex, rgb));
+                                } else saveSceneSlotColor(scene, index, slot, COLOR_VALUES[picked]);
+                            }).setNegativeButton("Cancel", null).show();
+                }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void saveSceneSlotColor(GlowScene scene, int index, int slot, int rgb) {
+        if (index < 0 || index >= scene.targets.size()) return;
+        try { replaceSceneTarget(scene, index, scene.targets.get(index).withColor(slot, rgb)); }
+        catch (JSONException e) { toast("Could not update scene color"); }
+    }
+
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     private void replaceSceneTarget(GlowScene scene, int index, GlowScene.Target target) {
         if (!scenes.contains(scene) || index < 0 || index >= scene.targets.size()) return;
         scene.targets.set(index, target);
@@ -957,6 +1057,7 @@ public class MainActivity extends Activity {
 
     private void playScene(GlowScene scene) {
         if (scene.targets.isEmpty()) { toast("This scene contains no lights"); return; }
+<<<<<<< HEAD
         message = "Applying " + scene.name + " to " + scene.targets.size() + " lights…";
         refreshVisibleState();
         List<WledDevice> available = new ArrayList<>(devices);
@@ -974,6 +1075,28 @@ public class MainActivity extends Activity {
                 refreshVisibleState();
                 refreshAll();
             });
+=======
+        final long requestId = beginCommandFeedback(scene.name, scene.targets.size());
+        List<WledDevice> available = new ArrayList<>(devices);
+        network.execute(() -> {
+            SceneExecutor.Result result = SceneExecutor.execute(scene, available,
+                    WledApi::snapshot, (host, patch) ->
+                            WledCommandVerifier.sendAndVerify(host, patch,
+                                    WledApi::send, WledApi::snapshot, WledApi::presets,
+                                    sentHost -> commandSent(requestId, scene.name)));
+            completeCommandFeedback(requestId, scene.name, result.succeeded,
+                    scene.targets.size(), result.unconfirmed,
+                    result.failed + result.missing, result.skippedSegments);
+            if (!result.problems.isEmpty()) ui.post(() -> {
+                if (requestId != commandSequence || isFinishing()) return;
+                new AlertDialog.Builder(this)
+                        .setTitle("Scene verification details")
+                        .setMessage(result.summary(scene.targets.size()) + "\n\n" +
+                                android.text.TextUtils.join("\n", result.problems))
+                        .setPositiveButton("OK", null).show();
+            });
+            for (WledDevice d : available) fetchDevice(d);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         });
     }
 
@@ -1123,6 +1246,7 @@ public class MainActivity extends Activity {
         }
         List<WledDevice> target = favoriteTargets(favorite);
         if (target.isEmpty()) { toast("Favorite unavailable: " + targetDescription(favorite.target)); return; }
+<<<<<<< HEAD
         message = "Activating " + favorite.name + "…";
         refreshVisibleState();
         network.execute(() -> {
@@ -1135,6 +1259,16 @@ public class MainActivity extends Activity {
                 toast(message);
                 refreshVisibleState();
             });
+=======
+        final long requestId = beginCommandFeedback(favorite.name, target.size());
+        network.execute(() -> {
+            ActionDispatcher.Result result = ActionDispatcher.execute(favorite, target,
+                    (host, patch) -> WledCommandVerifier.sendAndVerify(host, patch,
+                            WledApi::send, WledApi::snapshot, WledApi::presets,
+                            sentHost -> commandSent(requestId, favorite.name)));
+            completeCommandFeedback(requestId, favorite.name, result.successful, target.size(),
+                    result.unconfirmed, result.errors.size() - result.unconfirmed, result.unsupported);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             for (WledDevice d : target) fetchDevice(d);
         });
     }
@@ -1158,7 +1292,23 @@ public class MainActivity extends Activity {
     }
 
     private void addTouchColors(LinearLayout parent) {
+<<<<<<< HEAD
         LinearLayout card = touchCard("QUICK COLORS", "Palettes  ›", () -> openDrawer("palettes"));
+=======
+        LinearLayout card = touchCard("EFFECT COLORS", "Palettes  ›", () -> openDrawer("palettes"));
+        String[] labels = activeColorLabels();
+        if (!hasVisibleColorSlots(labels)) {
+            card.addView(text("This effect does not use manual color slots. Choose another effect to edit its colors.",
+                    13, MUTED, false));
+            parent.addView(card, sized(-1, -2));
+            return;
+        }
+        card.addView(text("Choose Fx, Bg or Cs to edit its color. Your current effect stays active.",
+                12, MUTED, false));
+        card.addView(space(1, 8));
+        card.addView(colorSlotRow(false));
+        card.addView(space(1, 10));
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         for (int r = 0; r < 2; r++) {
             LinearLayout row = horizontal(Gravity.CENTER_VERTICAL);
             for (int c = 0; c < 4; c++) {
@@ -1170,7 +1320,11 @@ public class MainActivity extends Activity {
                 item.setFocusable(true);
                 item.setClickable(true);
                 item.setTag("color:" + idx);
+<<<<<<< HEAD
                 item.setContentDescription("Set " + COLOR_NAMES[idx] + " color");
+=======
+                item.setContentDescription("Set selected effect color slot to " + COLOR_NAMES[idx]);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                 View spot = new View(this);
                 spot.setBackground(shape(color, 18, color, 0));
                 item.addView(spot, sized(27, 27));
@@ -1257,7 +1411,12 @@ public class MainActivity extends Activity {
         seek.setMax(255);
         seek.setProgress(level);
         seek.setTag(tag);
+<<<<<<< HEAD
         seek.setMinHeight(dp(48));
+=======
+        // The layout already provides a 48dp touch target. Do not call
+        // SeekBar.setMinHeight(): this method is absent on older Fire OS.
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         seek.setContentDescription(label);
         seek.setProgressTintList(ColorStateList.valueOf(ACCENT));
         seek.setThumbTintList(ColorStateList.valueOf(ACCENT));
@@ -1384,6 +1543,7 @@ public class MainActivity extends Activity {
 
         LinearLayout colorPanel = compactPanel();
         LinearLayout colorsTitle = horizontal(Gravity.CENTER_VERTICAL);
+<<<<<<< HEAD
         colorsTitle.addView(text("QUICK COLORS", 11, WHITE, true), new LinearLayout.LayoutParams(0, -2, 1));
         colorsTitle.addView(button("Palettes  ›", "open:palettes", () -> openDrawer("palettes"), false), sized(100, 28));
         colorPanel.addView(colorsTitle);
@@ -1413,6 +1573,43 @@ public class MainActivity extends Activity {
         colorPanel.addView(space(1, 5));
         colorPanel.addView(text("Select to set a solid color", 10, MUTED, false));
         left.addView(colorPanel, sized(-1, 121));
+=======
+        colorsTitle.addView(text("EFFECT COLORS", 11, WHITE, true), new LinearLayout.LayoutParams(0, -2, 1));
+        colorsTitle.addView(button("Palettes  ›", "open:palettes", () -> openDrawer("palettes"), false), sized(100, 28));
+        colorPanel.addView(colorsTitle);
+        String[] slots = activeColorLabels();
+        if (!hasVisibleColorSlots(slots)) {
+            colorPanel.addView(text("This effect uses no manual colors", 11, MUTED, false));
+        } else {
+            colorPanel.addView(space(1, 3));
+            colorPanel.addView(colorSlotRow(true));
+            colorPanel.addView(space(1, 4));
+            LinearLayout swatches = horizontal(Gravity.CENTER_VERTICAL);
+            for (int i = 0; i < COLOR_VALUES.length; i++) {
+                final int index = i;
+                int color = COLOR_VALUES[i];
+                TextView dot = text("●", 25, color, true);
+                dot.setGravity(Gravity.CENTER);
+                dot.setFocusable(true);
+                dot.setClickable(true);
+                dot.setTag("color:" + i);
+                dot.setContentDescription(COLOR_NAMES[i] + " for selected color slot; keep effect");
+                dot.setOnClickListener(v -> setColor(color));
+                dot.setBackground(shape(TILE, 13, TILE, 0));
+                dot.setOnFocusChangeListener((v, focused) -> {
+                    if (focused) rememberFocus(v);
+                    v.setBackground(shape(focused ? 0xFF2C4A75 : TILE, 13,
+                            focused ? ACCENT : TILE, focused ? 2 : 0));
+                });
+                LinearLayout.LayoutParams colorLp = new LinearLayout.LayoutParams(0, dp(31), 1);
+                if (index > 0) colorLp.leftMargin = dp(3);
+                swatches.addView(dot, colorLp);
+            }
+            colorPanel.addView(swatches);
+            colorPanel.addView(text("Tap a color slot to open its RGB picker", 10, MUTED, false));
+        }
+        left.addView(colorPanel, sized(-1, 141));
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
 
         LinearLayout effectPanel = compactPanel();
         LinearLayout effectsTitle = horizontal(Gravity.CENTER_VERTICAL);
@@ -1743,6 +1940,11 @@ public class MainActivity extends Activity {
 
     private void renderSettingsDrawer(LinearLayout list) {
         drawerInfo(list, "Advanced WLED options and app configuration.");
+<<<<<<< HEAD
+=======
+        list.addView(drawerItem("▦  Segment Studio", "Build, identify and control LED segments across multiple lights",
+                "settings:segments", this::openSegmentStudio, false), lpBottom(7));
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         list.addView(drawerItem("▦  Scenes", "Capture and coordinate several lights",
                 "settings:scenes", () -> openDrawer("scenes"), false), lpBottom(7));
         list.addView(drawerItem("★  Favorites", "Pin and manage one-tap lighting actions",
@@ -1755,8 +1957,13 @@ public class MainActivity extends Activity {
                 () -> openDrawer("palettes"), false), lpBottom(7));
         WledDevice d = currentDevice();
         if (!multiTarget() && d != null) {
+<<<<<<< HEAD
             if (d.segments.size() > 1) list.addView(drawerItem("▦  LED segments", "Select a segment", "drawer:segments",
                     this::showSegments, false), lpBottom(7));
+=======
+            if (d.segments.size() > 1) list.addView(drawerItem("▦  LED segments", "Choose a segment or open Segment Studio", "drawer:segments",
+                    this::openSegmentStudio, false), lpBottom(7));
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             list.addView(drawerItem("⚙  Manage " + d.name(), "Rename, remove or refresh", "drawer:manage",
                     this::showManageDialog, false), lpBottom(7));
         }
@@ -1766,7 +1973,11 @@ public class MainActivity extends Activity {
                 this::showAddDialog, false), lpBottom(7));
         list.addView(drawerItem("↻  Refresh status", "Read current state from every WLED device", "drawer:refresh",
                 () -> { refreshAll(); toast("Refreshing device status"); }, false), lpBottom(7));
+<<<<<<< HEAD
         drawerInfo(list, "GlowDeck v1.4  ·  Local network control  ·  TV, tablet and phone");
+=======
+        drawerInfo(list, "GlowDeck v1.7  ·  Local network control  ·  TV, tablet and phone");
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     }
 
     private static final class SavedGroup {
@@ -2022,15 +2233,22 @@ public class MainActivity extends Activity {
     private void send(String action, Command command) {
         List<WledDevice> target = targets();
         if (target.isEmpty()) { toast("Add a WLED device first"); return; }
+<<<<<<< HEAD
         message = "Sending " + action + "…";
         refreshVisibleState();
         network.execute(() -> {
             int ok = 0, skipped = 0;
             String firstError = "";
+=======
+        final long requestId = beginCommandFeedback(action, target.size());
+        network.execute(() -> {
+            int confirmed = 0, skipped = 0, unconfirmed = 0, failed = 0;
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             for (WledDevice d : target) {
                 try {
                     JSONObject patch = command.patch(d);
                     if (patch == null) { skipped++; continue; }
+<<<<<<< HEAD
                     WledApi.send(d.host, patch);
                     ok++;
                 } catch (Exception ex) { if (firstError.isEmpty()) firstError = concise(ex); }
@@ -2043,6 +2261,20 @@ public class MainActivity extends Activity {
                         (!error.isEmpty() ? "  ·  " + error : "");
                 refreshVisibleState();
             });
+=======
+                    WledCommandVerifier.sendAndVerify(d.host, patch, WledApi::send,
+                            WledApi::snapshot, WledApi::presets,
+                            sentHost -> commandSent(requestId, d.name()));
+                    confirmed++;
+                } catch (WledCommandVerifier.UnconfirmedException ex) {
+                    unconfirmed++;
+                } catch (Exception ex) {
+                    failed++;
+                }
+            }
+            completeCommandFeedback(requestId, action, confirmed, target.size(),
+                    unconfirmed, failed, skipped);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             for (WledDevice d : target) fetchDevice(d);
         });
     }
@@ -2079,12 +2311,146 @@ public class MainActivity extends Activity {
         send("brightness", d -> WledApi.object("bri", value));
     }
 
+<<<<<<< HEAD
     private void setColor(int rgb) {
         send("color", d -> {
             JSONArray components = new JSONArray().put(Color.red(rgb)).put(Color.green(rgb)).put(Color.blue(rgb));
             JSONObject seg = new JSONObject().put("col", new JSONArray().put(components)).put("fx", 0);
             return segmentPatch(d, seg);
         });
+=======
+    /** A quick swatch edits the selected color slot, without changing the running effect. */
+    private void setColor(int rgb) { setColorSlot(selectedColorSlot, rgb); }
+
+    private void setColorSlot(int slot, int rgb) {
+        if (slot < 0 || slot > 2) return;
+        selectedColorSlot = slot;
+        // Snapshot each command now, not when queued, so quick successive edits don't
+        // overwrite the other slots with stale values.
+        final java.util.Map<String, JSONObject> patches = new java.util.HashMap<>();
+        for (WledDevice d : targets()) {
+            try {
+                JSONArray segments = new JSONArray();
+                for (WledDevice.Segment segment : d.segments) {
+                    if (selectedSegment >= 0 && !multiTarget() && segment.id != selectedSegment) continue;
+                    if (!WledEffectColors.supports(d.metadataForEffect(segment.effect), slot)) continue;
+                    JSONArray next = WledEffectColors.withSlot(segment.colors, slot, rgb);
+                    segments.put(new JSONObject().put("id", segment.id).put("col", next));
+                    segment.colors = next; // local queued state for subsequent swatches
+                }
+                if (segments.length() > 0) {
+                    patches.put(d.host, new JSONObject().put("on", true).put("seg", segments));
+                } else if (d.segments.isEmpty() && WledEffectColors.supports(d.metadataForEffect(d.effect), slot)) {
+                    patches.put(d.host, new JSONObject().put("on", true)
+                            .put("seg", new JSONObject().put("col",
+                                    WledEffectColors.withSlot(null, slot, rgb))));
+                }
+            } catch (JSONException ignored) { }
+        }
+        String[] names = {"Fx", "Bg", "Cs"};
+        send(names[slot] + " color", d -> patches.get(d.host));
+    }
+
+    private String[] activeColorLabels() {
+        WledDevice d = currentDevice();
+        if (d == null) return WledEffectColors.labels(null);
+        WledDevice.Segment s = d.segmentFor(selectedSegment);
+        return WledEffectColors.labels(d.metadataForEffect(s == null ? d.effect : s.effect));
+    }
+
+    private int currentSlotColor(int slot) {
+        WledDevice d = currentDevice();
+        WledDevice.Segment s = d == null ? null : d.segmentFor(selectedSegment);
+        return s == null ? (d == null ? 0xFFFFA75F : d.rgb) :
+                WledEffectColors.rgb(s.colors, slot);
+    }
+
+    private boolean hasVisibleColorSlots(String[] names) {
+        for (String name : names) if (name != null) return true;
+        return false;
+    }
+
+    /** Three separate WLED effect color pickers; selected slot also drives quick swatches. */
+    private LinearLayout colorSlotRow(boolean tv) {
+        LinearLayout row = horizontal(Gravity.CENTER_VERTICAL);
+        String[] slots = activeColorLabels();
+        if (slots[selectedColorSlot] == null)
+            for (int i = 0; i < slots.length; i++) if (slots[i] != null) {
+                selectedColorSlot = i; break;
+            }
+        for (int i = 0; i < slots.length; i++) {
+            if (slots[i] == null) continue;
+            final int slot = i;
+            int color = currentSlotColor(i);
+            boolean active = i == selectedColorSlot;
+            String title = slots[i].length() > 7 ? slots[i].substring(0, 7) : slots[i];
+            TextView picker = button((active ? "● " : "○ ") + title, "color:slot:" + i,
+                    () -> { selectedColorSlot = slot; showColorPicker(slot, this::setColorSlot); }, active);
+            picker.setContentDescription("Pick " + slots[i] + " color, current " + hexColor(color));
+            picker.setTextColor(active ? ACCENT : WHITE);
+            android.text.SpannableString marked = new android.text.SpannableString("● " + title);
+            marked.setSpan(new android.text.style.ForegroundColorSpan(color), 0, 1,
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            picker.setText(marked);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(tv ? 28 : 48), 1);
+            if (row.getChildCount() > 0) lp.leftMargin = dp(tv ? 4 : 8);
+            row.addView(picker, lp);
+        }
+        return row;
+    }
+
+    private interface ColorPicked { void onPick(int slot, int rgb); }
+
+    private String hexColor(int value) {
+        return String.format(Locale.US, "#%06X", value & 0xFFFFFF);
+    }
+
+    /** No external color-picker dependency. RGB sliders work on older Fire OS. */
+    private void showColorPicker(int slot, ColorPicked onPick) {
+        showColorPicker(slot, currentSlotColor(slot), activeColorLabels(), onPick);
+    }
+
+    private void showColorPicker(int slot, int original, String[] labels, ColorPicked onPick) {
+        String name = labels[slot] == null ? new String[]{"Fx", "Bg", "Cs"}[slot] : labels[slot];
+        LinearLayout content = vertical();
+        content.setPadding(dp(22), dp(12), dp(22), dp(8));
+        TextView preview = text(hexColor(original), 18, WHITE, true);
+        preview.setGravity(Gravity.CENTER);
+        preview.setBackground(shape(original | 0xFF000000, 12, ACCENT, 1));
+        content.addView(preview, sized(-1, 54));
+        SeekBar[] sliders = new SeekBar[3];
+        int[] values = {Color.red(original), Color.green(original), Color.blue(original)};
+        String[] channels = {"Red", "Green", "Blue"};
+        Runnable update = () -> {
+            int value = Color.rgb(values[0], values[1], values[2]);
+            preview.setText(hexColor(value));
+            preview.setBackground(shape(value, 12, ACCENT, 1));
+        };
+        for (int i = 0; i < 3; i++) {
+            int channel = i;
+            TextView title = text(channels[i], 13, WHITE, false);
+            content.addView(title);
+            SeekBar slider = new SeekBar(this);
+            slider.setMax(255);
+            slider.setProgress(values[i]);
+            slider.setContentDescription(channels[i] + " color channel");
+            slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onStartTrackingTouch(SeekBar bar) { }
+                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                    if (!fromUser) return;
+                    values[channel] = progress;
+                    update.run();
+                }
+                @Override public void onStopTrackingTouch(SeekBar bar) { }
+            });
+            content.addView(slider, sized(-1, 44));
+            sliders[i] = slider;
+        }
+        new AlertDialog.Builder(this).setTitle("WLED " + name + " color")
+                .setView(content).setNegativeButton("Cancel", null)
+                .setPositiveButton("Apply", (dialog, which) ->
+                        onPick.onPick(slot, Color.rgb(values[0], values[1], values[2]))).show();
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     }
 
     private void setEffect(int id) {
@@ -2184,6 +2550,13 @@ public class MainActivity extends Activity {
         });
     }
 
+<<<<<<< HEAD
+=======
+    private void openSegmentStudio() {
+        startActivity(new android.content.Intent(this, SegmentStudioActivity.class));
+    }
+
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     private void showSegments() {
         WledDevice d = currentDevice();
         if (d == null) return;
@@ -2295,10 +2668,21 @@ public class MainActivity extends Activity {
                 boolean changed = !d.online || !stateSignature.equals(d.lastStateSignature);
                 int previousEffectCount = d.effects.size();
                 int previousSegmentCount = d.segments.size();
+<<<<<<< HEAD
                 d.applySnapshot(snapshot);
                 // Only rebuild if new controls became available; status polling updates in place.
                 if (previousEffectCount != d.effects.size() ||
                         previousSegmentCount != d.segments.size()) {
+=======
+                int previousEffect = d.segmentFor(selectedSegment) == null ? d.effect :
+                        d.segmentFor(selectedSegment).effect;
+                d.applySnapshot(snapshot);
+                // An effect change can change visible color slots; rebuild only then.
+                if (previousEffectCount != d.effects.size() ||
+                        previousSegmentCount != d.segments.size() ||
+                        (targets().contains(d) && previousEffect !=
+                            (d.segmentFor(selectedSegment) == null ? d.effect : d.segmentFor(selectedSegment).effect))) {
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                     if (adjustingSliderTag == null) {
                         render();
                         if (drawerOverlay != null && ("effects".equals(activeDrawer) ||
@@ -2307,6 +2691,10 @@ public class MainActivity extends Activity {
                     } else { deferredStructuralRender = true; refreshVisibleState(); }
                 } else if (changed) refreshVisibleState();
                 if (!d.loadedPresets) requestPresets(d);
+<<<<<<< HEAD
+=======
+                if (!d.loadedEffectMetadata) requestEffectMetadata(d);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             });
         } catch (Exception ex) {
             ui.post(() -> {
@@ -2320,6 +2708,32 @@ public class MainActivity extends Activity {
         }
     }
 
+<<<<<<< HEAD
+=======
+    private void requestEffectMetadata(WledDevice d) {
+        if (d.loadedEffectMetadata || d.loadingEffectMetadata || d.effects.isEmpty()) return;
+        d.loadingEffectMetadata = true;
+        network.execute(() -> {
+            try {
+                JSONArray metadata = WledApi.effectMetadata(d.host);
+                ui.post(() -> {
+                    if (!devices.contains(d)) return;
+                    d.applyEffectMetadata(metadata);
+                    if (targets().contains(d)) render();
+                });
+            } catch (Exception ignored) {
+                // Older WLED may not implement /json/fxdata. Keep legacy slots.
+                ui.post(() -> {
+                    if (!devices.contains(d)) return;
+                    d.loadingEffectMetadata = false;
+                    d.loadedEffectMetadata = true;
+                    if (targets().contains(d)) render();
+                });
+            }
+        });
+    }
+
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     private void requestPresets(WledDevice d) {
         if (d.loadedPresets || d.loadingPresets) return;
         d.loadingPresets = true; // queued: don't flood the tiny WLED HTTP server.
@@ -2360,6 +2774,10 @@ public class MainActivity extends Activity {
                 render();
                 if (drawerOverlay != null && activeDrawer.equals("devices")) showDrawer();
                 requestPresets(newDevice);
+<<<<<<< HEAD
+=======
+                requestEffectMetadata(newDevice);
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
             });
         } catch (Exception ex) {
             ui.post(() -> {
@@ -2454,6 +2872,85 @@ public class MainActivity extends Activity {
         scanning = false;
     }
 
+<<<<<<< HEAD
+=======
+    /** Nonblocking in-app notification for Fire TV, tablet and phone. */
+    private void showBanner(String label, int color, boolean pending) {
+        bannerText = label;
+        bannerColor = color;
+        bannerPending = pending;
+        if (rootFrame == null) return;
+        if (commandBanner != null) rootFrame.removeView(commandBanner);
+        FrameLayout panel = new FrameLayout(this);
+        panel.setFocusable(false);
+        panel.setClickable(false);
+        panel.setBackground(shape(0xEE13223A, 12, color, 2));
+        TextView status = text((pending ? "◌  " : "") + label, tvMode ? 12 : 14, WHITE, true);
+        status.setPadding(dp(14), dp(11), dp(14), dp(11));
+        status.setMaxLines(3);
+        status.setFocusable(false);
+        status.setClickable(false);
+        status.setContentDescription(label);
+        panel.addView(status, new FrameLayout.LayoutParams(-2, -2));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT);
+        lp.setMargins(dp(12), dp(tvMode ? 66 : 72), dp(14), 0);
+        rootFrame.addView(panel, lp);
+        commandBanner = panel;
+        panel.bringToFront();
+    }
+
+    private long beginCommandFeedback(String action, int count) {
+        long id = ++commandSequence;
+        if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
+        showBanner("Request queued · " + action + " (" + count + " light" + (count == 1 ? "" : "s") + ")",
+                ACCENT, true);
+        return id;
+    }
+
+    private void commandSent(long id, String deviceName) {
+        ui.post(() -> {
+            if (id != commandSequence || isFinishing()) return;
+            showBanner("Request sent to " + deviceName + " · checking WLED state…", ACCENT, true);
+        });
+    }
+
+    private void completeCommandFeedback(long id, String name, int confirmed, int total,
+                                         int unconfirmed, int failed, int unsupported) {
+        ui.post(() -> {
+            if (id != commandSequence || isFinishing()) return;
+            boolean all = total > 0 && confirmed == total && unconfirmed == 0 && failed == 0 && unsupported == 0;
+            String label;
+            int color;
+            if (all) {
+                label = "✓ Confirmed · " + name + " · " + confirmed + "/" + total + " lights";
+                color = GOOD;
+            } else if (confirmed > 0 || unconfirmed > 0) {
+                label = "⚠ " + name + " · " + confirmed + "/" + total + " confirmed";
+                if (unconfirmed > 0) label += " · " + unconfirmed + " not confirmed";
+                if (failed > 0) label += " · " + failed + " failed";
+                if (unsupported > 0) label += " · " + unsupported + " unsupported";
+                color = 0xFFFFC76E;
+            } else {
+                label = "✕ " + name + " · change not confirmed";
+                if (failed > 0) label += " · " + failed + " failed";
+                if (unsupported > 0) label += " · " + unsupported + " unsupported";
+                color = BAD;
+            }
+            message = label;
+            showBanner(label, color, false);
+            if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
+            final long completedId = id;
+            dismissCommandBanner = () -> {
+                if (completedId != commandSequence) return;
+                if (commandBanner != null && rootFrame != null) rootFrame.removeView(commandBanner);
+                commandBanner = null;
+                bannerText = "";
+            };
+            ui.postDelayed(dismissCommandBanner, all ? 4200 : 7500);
+        });
+    }
+
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
     private static String concise(Exception e) {
         String s = e.getMessage();
@@ -2695,7 +3192,11 @@ public class MainActivity extends Activity {
         if (drawerOverlay != null) return routeDrawerDpad(current, code);
         String tag = focusedTag();
         if (tag != null && tag.startsWith("nav:")) {
+<<<<<<< HEAD
             String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:scenes",
+=======
+            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:scenes", "nav:segments",
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
                     "nav:effects", "nav:presets", "nav:settings"};
             int index = 0;
             for (int i = 0; i < nav.length; i++) if (nav[i].equals(tag)) index = i;

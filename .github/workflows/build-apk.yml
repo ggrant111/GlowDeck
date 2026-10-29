@@ -2,7 +2,11 @@ name: Build Android APK
 
 on:
   push:
+<<<<<<< HEAD
     branches: [main, feature/v1.6-scenes]
+=======
+    branches: [main, feature/v1.6.2-command-feedback, feature/v1.6.3-effect-colors, feature/v1.7-segment-studio, feature/v1.7.1-udp-preview, feature/v1.7.2-live-effects]
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
   workflow_dispatch:
 
 permissions:
@@ -34,11 +38,19 @@ jobs:
         with:
           gradle-version: '8.9'
           validate-wrappers: true
+<<<<<<< HEAD
       - name: Test favorites/scenes and build debug APK
+=======
+      - name: Test live effect renderer, UDP and build Android APK
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
+<<<<<<< HEAD
           name: GlowDeck-v1.6-scenes-debug-apk
+=======
+          name: GlowDeck-v1.7.2-live-effects-debug-apk
+>>>>>>> 62916f5714b46463127f168628eceeae27726df4
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
