@@ -1,5 +1,23 @@
 # Change log
 
+## v1.7.2 — Native Live Effects Engine
+- Five standalone UDP-streamed effects: Chase/Comet, Color Wipe, Rainbow Flow, Pulse/Breathe, Sparkle.
+- Live Android controls for effect, primary/secondary color, speed, and brightness on saved physical segments and cross-device zones.
+- Native Java frame generator streams 15 FPS directly over WLED realtime UDP to selected LED indexes without a server.
+- Combined 1.7.1 DNRGB segment identifier and DDP full-strip test remain available.
+- Conservatively limited 90-second sessions, stop-on-dismiss/background, recovery snapshots, active-realtime-source check, and WLED-configured UDP port support.
+- Added JVM unit tests for algorithms and offset packetization. VersionCode 14.
+
+
+## v1.7.1 — No-server live UDP segment identification and DDP test
+- Add native unicast UDP WLED streaming from the Android device: DNRGB port 21324 for targeted segment identification and DDP RGB24 port 4048 for a whole-strip connectivity test.
+- Preview Solid amber, Chase, or Start/End markers on physical segments or multiple controllers in a saved zone. Additional range-editor preview works without saving segment changes.
+- Add 12-second session timeout, explicit stop, saved recovery snapshots, controller identity/range checks, WLED live-stream conflict checks, and best-effort restoration after realtime timeout.
+- DDP test deliberately takes over the full selected strip; realtime streaming can pause other effects. Clearly label UDP packets as unacknowledged, not device-confirmed.
+- Add pure-Java protocol regression tests for DNRGB headers/chunking, DDP push/offset, 16-bit bounds, and marker animations.
+- No background service, cloud or separate server needed; live streaming requires GlowDeck to remain in foreground. Full custom effects engine deferred to v1.7.2.
+
+
 ## v1.7.0 — Segment Studio & multi-device zones
 - Physical segment discovery and non-overlapping split/create/resize/rename/delete controls.
 - Multi-controller zones targeting individual WLED segment IDs and boundaries.
