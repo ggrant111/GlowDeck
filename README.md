@@ -2,7 +2,7 @@
 
 This repository contains the full GlowDeck v1.4 Android Studio project for Fire TV, Android tablets, and Android phones. The GitHub Actions workflow at `.github/workflows/build-apk.yml` builds a **debug APK** on pushes to `main` and on manual runs. After a successful run, download `GlowDeck-v1.4-debug-apk` under the **Actions → latest successful run → Artifacts** section. You must be signed into GitHub to download the artifact. Debug builds are for sideloading and testing, not Play Store releases.
 
-**Note:** GitHub Actions has not been executed or verified; the source has passed previous syntax checks but must still compile on a machine with Android SDK. The workflow invokes Gradle 8.9 directly rather than the project's bundled custom bootstrap wrapper.
+**Build status:** GitHub Actions successfully compiled and uploaded a debug APK. The workflow uses Gradle 8.9 with the official validated wrapper JAR. Physical Fire TV, tablet, and phone testing is still required.
 
 ---
 
@@ -69,4 +69,4 @@ Official API: https://github.com/wled/WLED-Docs/blob/main/docs/interfaces/json-a
 
 ## Validation
 
-Java source parsed successfully and ZIP/XML structure checked. This environment lacks Android SDK and the physical devices, so an APK was not compiled and behavior still requires real-device testing. Android Studio is needed to build.
+GitHub Actions successfully built a debug APK; real-device behavior still needs validation on Fire TV, Android tablets and Android phones. Android Studio is also supported for local builds.
