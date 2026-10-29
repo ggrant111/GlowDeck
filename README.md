@@ -1,12 +1,54 @@
-# GlowDeck Android — GitHub repository
+# GlowDeck v1.5 — Favorites & Shortcuts
 
-This repository contains the full GlowDeck v1.4 Android Studio project for Fire TV, Android tablets, and Android phones. The GitHub Actions workflow at `.github/workflows/build-apk.yml` builds a **debug APK** on pushes to `main` and on manual runs. After a successful run, download `GlowDeck-v1.4-debug-apk` under the **Actions → latest successful run → Artifacts** section. You must be signed into GitHub to download the artifact. Debug builds are for sideloading and testing, not Play Store releases.
+**Version:** 1.5.0 (Android application ID `com.glowdeck.tv`, versionCode 7). One APK for Fire TV, Android tablets, and phones.
 
-**Build status:** GitHub Actions successfully compiled and uploaded a debug APK. The workflow uses Gradle 8.9 with the official validated wrapper JAR. Physical Fire TV, tablet, and phone testing is still required.
+## What's new in v1.5
+
+- ★ **Favorites** now replaces the redundant Scenes item in the TV/tablet sidebar. Phone bottom navigation includes Faves. Saved WLED presets remain accessible under Presets.
+- One-tap buttons on the TV's existing bottom shortcut strip (up to three) and a prominent Favorites card on touch devices (up to six). No additional vertical space added to the TV dashboard.
+- Favorite actions: explicit Power On / Off, 25/50/75/100% brightness, eight quick colors, and any existing WLED preset.
+- Choose **Lights** (one device, All Devices, or a saved Group) before **Favorites > Add Favorite** to set the destination for a shortcut.
+- Manage Favorites: run, rename, move up/down, or remove without modifying the original WLED preset or device. Maximum 50 stored favorites.
+- Favorites survive rotation and restarts; group actions follow saved membership changes. A missing target, unsupported preset, or offline device shows a meaningful result.
+- Local shared configuration repository migrates saved v1.4 devices/groups without losing them and retains legacy keys during the v1.5 beta. Favorites are stored in versioned JSON accessible to future scene/widget components.
+- New `ActionDispatcher` performs reusable WLED commands independently of `MainActivity`, with bounded serial execution through the existing WLED network executor. It is designed to be reused by the v1.6 Scene Builder and v1.8 Android widgets.
+- Gradle unit tests cover favorite serialization, explicit power/brightness, multi-segment color, preset ID mapping, partial failure, and pre-catalog single-device presets. CI runs unit tests before building the debug APK.
+
+### Get started
+
+1. Open GlowDeck and choose **Lights** to select one controller, a Group, or All Devices.
+2. Open **Favorites** (star icon), select **+ Add favorite**, then choose a type.
+3. For a WLED preset, allow the device to load the saved presets first. Enter a short shortcut name and save.
+4. Use the home-screen shortcut to run it anytime. Use **Manage** to rename/reorder/remove.
+
+**Important:** A favorite acts on its saved target, not whichever device is currently selected. WLED traffic remains local and works without internet; there is no cloud sync yet. Multiple devices receive one request each; if a preset is absent from one controller it is skipped and reported as unsupported rather than applying an unrelated preset.
+
+### Roadmap status
+
+- v1.5: **Favorites and reusable action layer** (implemented, pending real-device acceptance checks).
+- v1.6: Independently saved multi-device GlowDeck scenes (not implemented).
+- v1.7: Optional cross-device sync / pairing (not implemented).
+- v1.8: Android home-screen widgets (not implemented).
+
+## Build, test and install
+
+Open this folder in Android Studio, sync Gradle with JDK 17 and Android SDK 35, and build `app:assembleDebug`. Run `app:testDebugUnitTest` for the action tests. The debug APK is `app/build/outputs/apk/debug/app-debug.apk`. Or download the latest successful GitHub Actions artifact.
+
+The package ID is unchanged. If updating from an APK signed with a different certificate, Android will reject in-place installation; back up configuration before removing the old app.
 
 ---
 
-# GlowDeck v1.4 — Universal Fire TV / Android Tablet / Android Phone
+## Previous v1.4 documentation
+
+# GlowDeck Android — GitHub repository
+
+This repository contains the full GlowDeck v1.4.1 Android Studio project for Fire TV, Android tablets, and Android phones. The GitHub Actions workflow at `.github/workflows/build-apk.yml` builds a **debug APK** on pushes to `main` and on manual runs. After a successful run, download `GlowDeck-v1.4-debug-apk` under the **Actions → latest successful run → Artifacts** section. You must be signed into GitHub to download the artifact. Debug builds are for sideloading and testing, not Play Store releases.
+
+**Note:** GitHub Actions has not been executed or verified; the source has passed previous syntax checks but must still compile on a machine with Android SDK. The workflow invokes Gradle 8.9 directly rather than the project's bundled custom bootstrap wrapper.
+
+---
+
+# GlowDeck v1.4.1 — Universal Fire TV / Android Tablet / Android Phone
 
 Native Java Android Studio project; supports WLED's local JSON API without a WebView or cloud account. Application ID remains `com.glowdeck.tv` so existing Fire TV users can upgrade (when signed with the same signing key).
 
@@ -69,4 +111,7 @@ Official API: https://github.com/wled/WLED-Docs/blob/main/docs/interfaces/json-a
 
 ## Validation
 
-GitHub Actions successfully built a debug APK; real-device behavior still needs validation on Fire TV, Android tablets and Android phones. Android Studio is also supported for local builds.
+Java source parsed successfully and ZIP/XML structure checked. This environment lacks Android SDK and the physical devices, so an APK was not compiled and behavior still requires real-device testing. Android Studio is needed to build.
+
+## App branding in v1.4.1
+The new cyan-to-blue G/home/Wi-Fi brand mark is included as the Android launcher icon (`mipmap-*`), the adaptive/round launcher icon (`mipmap-anydpi-v26`), and the 320x180 Fire TV launcher banner (`drawable-nodpi/tv_banner.png`). Full transparent logo assets are kept in `drawable-nodpi/glowdeck_brand_full.png` and `glowdeck_brand_mark.png`. Existing screens, saved devices, package ID and WLED functionality are unchanged. Version code is incremented to 6.
