@@ -11,6 +11,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
+import android.widget.AdapterView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -36,16 +39,28 @@ public final class SegmentStudioActivity extends Activity {
     private final List<SegmentZone> zones=new ArrayList<>();
     private GlowDeckRepository repo;
     private SegmentPreviewManager preview;
+    private UdpLiveSession udp;
     private LinearLayout content;
     private TextView status;
     private boolean zoneTab=false;
     private final Runnable previewTimeout=()->stopPreview("Identification timed out");
+    private final Runnable udpTimeout=()->stopUdp("Live UDP session ended");
+    private final Runnable udpStatus = new Runnable() {
+        @Override public void run() {
+            if (!udp.active()) return;
+            if (status != null) status.setText("UDP streaming · " + udp.sentPackets() +
+                    " packets sent (delivery not acknowledged)" +
+                    (udp.lastError().isEmpty() ? "" : " · Error: " + udp.lastError()));
+            ui.postDelayed(this, 1000);
+        }
+    };
     private boolean stopped=false;
 
     @Override public void onCreate(Bundle saved) {
         super.onCreate(saved);
         repo=new GlowDeckRepository(this,getPreferences(MODE_PRIVATE));
         preview=new SegmentPreviewManager(this);
+        udp=new UdpLiveSession(this);
         zones.addAll(repo.loadZones());
         loadDevices();
         buildShell();
@@ -56,15 +71,17 @@ public final class SegmentStudioActivity extends Activity {
         stopped=false;
         worker.execute(()->{
             String restored=preview.recover();
+            String udpRecovery=udp.recover();
             if(!"No active identification".equals(restored))ui.post(()->notifyStatus(restored));
+            if(!"No UDP preview to restore".equals(udpRecovery))ui.post(()->notifyStatus(udpRecovery));
         });
     }
     @Override protected void onPause() {
-        stopped=true;ui.removeCallbacks(previewTimeout);
-        worker.execute(()->preview.stop());
+        stopped=true;ui.removeCallbacks(previewTimeout);ui.removeCallbacks(udpTimeout);ui.removeCallbacks(udpStatus);
+        worker.execute(()->{udp.stop();preview.stop();});
         super.onPause();
     }
-    @Override protected void onDestroy(){worker.shutdown();super.onDestroy();}
+    @Override protected void onDestroy(){worker.shutdown();udp.shutdown();super.onDestroy();}
     private void loadDevices() {
         try {
             JSONArray list=new JSONArray(repo.readDevices()==null?"[]":repo.readDevices());
@@ -138,7 +155,9 @@ public final class SegmentStudioActivity extends Activity {
     }
     private void renderDevices() {
         LinearLayout top=card("Physical WLED segments","Choose a segment to control, identify, rename, resize or remove. LED numbers start at 1.");
-        top.addView(button("↻ Refresh devices",this::refresh));addCard(top);
+        top.addView(button("↻ Refresh devices",this::refresh));
+        top.addView(button("UDP status / stop streaming", this::udpControls));
+        addCard(top);
         for(WledDevice d:devices) {
             LinearLayout c=card(d.name()+(d.online?"  ●":"  ○"),d.online?
                     d.ledCount+" LEDs · "+d.segments.size()+" segments · "+d.host:
@@ -150,6 +169,7 @@ public final class SegmentStudioActivity extends Activity {
                     c.addView(button(desc,()->segmentActions(d,s)));
                 }
                 c.addView(button("+ Create segment",()->createSegment(d)));
+                c.addView(button("Test DDP on entire strip (12s)",()->confirmDdpTest(d)));
                 c.addView(button("Save layout as WLED preset…",()->saveLayout(d)));
             }
             addCard(c);
@@ -161,6 +181,7 @@ public final class SegmentStudioActivity extends Activity {
     private void renderZones() {
         LinearLayout info=card("Cross-controller zones","Group physical segments from any WLED controllers. Each range keeps its own segment and identity.");
         info.addView(button("+ Create a zone",this::createZone));
+        info.addView(button("UDP streaming status / stop",this::udpControls));
         info.addView(button("↻ Refresh devices",this::refresh));
         addCard(info);
         for(SegmentZone zone:new ArrayList<>(zones)) {
@@ -168,7 +189,9 @@ public final class SegmentStudioActivity extends Activity {
             for(SegmentZone.Member m:zone.members){if(members.length()>0)members.append("  ·  ");members.append(m.segmentName).append(" (").append(m.start+1).append("–").append(m.stop).append(")");}
             LinearLayout c=card(zone.name,zone.members.size()+" segments across devices\n"+members);
             c.addView(button("▶ Control this zone",()->zoneActions(zone)));
-            c.addView(button("Identify selected LEDs",()->identify(zone.members)));
+            c.addView(button("Identify selected LEDs (JSON)",()->identify(zone.members)));
+            c.addView(button("▶ Live Effects · Chase / Rainbow / Pulse / more",()->liveEffectControls(zone.members,zone.name)));
+            c.addView(button("Live UDP identification",()->chooseUdpIdentify(zone.members)));
             c.addView(button("Edit members / name / delete",()->zoneEdit(zone)));
             addCard(c);
         }
@@ -228,22 +251,24 @@ public final class SegmentStudioActivity extends Activity {
     private void segmentActions(WledDevice d,WledDevice.Segment s) {
         SegmentZone z=SegmentZone.create(s.label());z.members.add(SegmentZone.Member.of(d,s));
         new AlertDialog.Builder(this).setTitle(d.name()+" · "+s.label()+" · "+(s.start+1)+"–"+s.stop)
-                .setItems(new String[]{"Control effect/colors/power","Identify selected LEDs","Rename segment","Resize range",
+                .setItems(new String[]{"Control effect/colors/power","Identify selected LEDs (JSON)","Live UDP identify / chase","Live Effects (streamed)","Rename segment","Resize range",
                         "Reverse animation direction","Remove segment","Add to existing zone"},(dlg,i)->{
                     if(i==0)zoneActions(z);
                     if(i==1)identify(z.members);
-                    if(i==2)askText("Rename segment","Segment name",s.label(),name->{
+                    if(i==2)chooseUdpIdentify(z.members);
+                    if(i==3)liveEffectControls(z.members,d.name()+" · "+s.label());
+                    if(i==4)askText("Rename segment","Segment name",s.label(),name->{
                         if(!name.trim().isEmpty())mutate(d,"Rename segment",snap->WledSegmentPlanner.rename(snap,s.id,name.trim()),s.id,-1,-1,name.trim());
                     });
-                    if(i==3)rangeDialog(d,s.start+1,s.stop,"Resize "+s.label(),(start,end)->
+                    if(i==5)rangeDialog(d,s.start+1,s.stop,"Resize "+s.label(),(start,end)->
                             mutate(d,"Resize segment",snap->WledSegmentPlanner.resize(snap,s.id,start-1,end),s.id,start-1,end,null));
-                    if(i==4)mutate(d,"Reverse segment",snap->WledSegmentPlanner.change(snap,s.id,
+                    if(i==6)mutate(d,"Reverse segment",snap->WledSegmentPlanner.change(snap,s.id,
                             new JSONObject().put("rev",!s.reverse)),s.id,-1,-1,null);
-                    if(i==5)new AlertDialog.Builder(this).setTitle("Remove "+s.label()+"?")
+                    if(i==7)new AlertDialog.Builder(this).setTitle("Remove "+s.label()+"?")
                             .setMessage("The WLED segment will be deleted. Zones referencing this segment may need updating.")
                             .setNegativeButton("Cancel",null).setPositiveButton("Delete",(x,y)->
                                     mutate(d,"Delete segment",snap->WledSegmentPlanner.delete(snap,s.id),s.id,-1,0,null)).show();
-                    if(i==6)addToZone(SegmentZone.Member.of(d,s));
+                    if(i==8)addToZone(SegmentZone.Member.of(d,s));
                 }).show();
     }
     private void addToZone(SegmentZone.Member member) {
@@ -297,6 +322,18 @@ public final class SegmentStudioActivity extends Activity {
                         "LEDs "+a+"–"+b));
                 identify(selection);
             }catch(Exception ex){notifyStatus("Cannot identify: "+ex.getMessage());}
+        }));
+        body.addView(button("Live UDP: Chase / Show ends / Solid (12s)",()->{
+            try {
+                int a=Integer.parseInt(start.getText().toString()), b=Integer.parseInt(end.getText().toString());
+                if(a<1||b<a||b>device.ledCount)throw new Exception("Invalid LED range");
+                WledDevice.Segment owner=null;
+                for(WledDevice.Segment seg:device.segments)if(seg.start<=a-1&&seg.stop>=b){owner=seg;break;}
+                if(owner==null)throw new Exception("Range must fit inside a physical WLED segment");
+                List<SegmentZone.Member> selection=new ArrayList<>();
+                selection.add(new SegmentZone.Member(device.identity(),device.host,owner.id,a-1,b,"LEDs "+a+"–"+b));
+                chooseUdpIdentify(selection);
+            }catch(Exception ex){notifyStatus("Cannot preview: "+ex.getMessage());}
         }));
         new AlertDialog.Builder(this).setTitle(title).setView(body)
                 .setNegativeButton("Cancel",null).setPositiveButton("Continue",(dialog,which)->{
@@ -447,6 +484,7 @@ public final class SegmentStudioActivity extends Activity {
         ui.removeCallbacks(previewTimeout);
         notifyStatus("Starting temporary LED identification…");
         worker.execute(()->{
+            if(udp.active()) udp.stop();
             String outcome=preview.begin(members,new ArrayList<>(devices));
             ui.post(()->{
                 notifyStatus(outcome);
@@ -468,6 +506,185 @@ public final class SegmentStudioActivity extends Activity {
             ui.post(()->notifyStatus(reason+" · "+restore));
         });
     }
+    /** UDP is unacknowledged and temporarily takes over WLED's output, not a persistent segment effect. */
+    private void chooseUdpIdentify(List<SegmentZone.Member> members) {
+        if(members==null||members.isEmpty()){notifyStatus("Select at least one range");return;}
+        String[] modes={"Solid amber (selected LEDs)","Chase / moving locator","Show start (cyan) and end (pink)"};
+        new AlertDialog.Builder(this).setTitle("Live UDP Segment Identify")
+                .setMessage("Realtime UDP may black out or pause other effects on these controllers. " +
+                        "WLED returns to normal after the stream stops; GlowDeck also attempts state restoration. " +
+                        "Only use while GlowDeck is open. 12-second safety timeout.")
+                .setItems(modes,(dialog,i)->startUdp(members,
+                        i==0?UdpRealtimePackets.Mode.SOLID:i==1?UdpRealtimePackets.Mode.CHASE:UdpRealtimePackets.Mode.ENDS))
+                .setNegativeButton("Cancel",null).show();
+    }
+    private void confirmDdpTest(WledDevice d) {
+        if(!d.online||d.segments.isEmpty()){
+            notifyStatus("Refresh the WLED controller before testing DDP");return;
+        }
+        new AlertDialog.Builder(this).setTitle("DDP full-strip UDP test")
+                .setMessage("Test a moving rainbow streamed DIRECTLY from this Android device to " + d.name() +
+                        " over UDP 4048. It temporarily takes over the ENTIRE strip (" + d.ledCount +
+                        " LEDs), may interrupt other segment effects, and needs the app to remain open. " +
+                        "Runs for a maximum of 12 seconds; state restoration is best-effort.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Start 12s test",(dialog,i)->{
+                    List<SegmentZone.Member> choice=new ArrayList<>();
+                    choice.add(SegmentZone.Member.of(d,d.segments.get(0)));
+                    startUdp(choice,UdpRealtimePackets.Mode.DDP_RAINBOW_TEST);
+                }).show();
+    }
+    private void udpControls() {
+        if(udp.active()){
+            new AlertDialog.Builder(this).setTitle("UDP Streaming")
+                    .setMessage(udp.sentPackets()+" packets sent. UDP is unacknowledged; " +
+                            "controller output is not independently verified. " +
+                            (udp.lastError().isEmpty()?"":"Error: "+udp.lastError()))
+                    .setPositiveButton("Stop & restore",(dialog,i)->stopUdp("Stopped"))
+                    .setNegativeButton("Continue",null).show();
+        }else{
+            new AlertDialog.Builder(this).setTitle("UDP streaming")
+                    .setMessage("No active live UDP session. Use a segment or zone's Live UDP Identify " +
+                            "button, or test a device's full-strip DDP. No separate server is needed.")
+                    .setPositiveButton("Restore pending lighting",(dialog,i)->worker.execute(()->{
+                        String outcome=udp.recover();ui.post(()->notifyStatus(outcome));
+                    })).setNegativeButton("Close",null).show();
+        }
+    }
+    private void startUdp(List<SegmentZone.Member> members,UdpRealtimePackets.Mode mode) {
+        ui.removeCallbacks(previewTimeout);
+        ui.removeCallbacks(udpTimeout);
+        ui.removeCallbacks(udpStatus);
+        notifyStatus("Preparing live UDP · taking recovery snapshots…");
+        worker.execute(()->{
+            if(preview.active()) preview.stop();
+            if(udp.active()) udp.stop();
+            String outcome=udp.start(new ArrayList<>(members),new ArrayList<>(devices),mode);
+            ui.post(()->{
+                notifyStatus(outcome);
+                if(udp.active()&&!isFinishing()){
+                    ui.postDelayed(udpTimeout,12000);
+                    ui.postDelayed(udpStatus,1000);
+                    new AlertDialog.Builder(this).setTitle("Live UDP · 12 seconds")
+                            .setMessage("The selected LED pixels are streaming on your local network. " +
+                                    "Other effects on the controller may be interrupted. " +
+                                    "UDP sends are not acknowledgments from WLED.")
+                            .setPositiveButton("Stop & restore",(dialog,i)->stopUdp("Stopped"))
+                            .setOnDismissListener(dialog->stopUdp("Restoring original effects"))
+                            .show();
+                }
+            });
+        });
+    }
+    private void stopUdp(String reason) {
+        ui.removeCallbacks(udpTimeout);
+        ui.removeCallbacks(udpStatus);
+        worker.execute(()->{
+            String outcome=udp.stop();
+            ui.post(()->{notifyStatus(reason+" · "+outcome);refresh();});
+        });
+    }
+
+    /** Local-only live effects: controls remain open so a tablet or Fire TV can stop instantly.
+     * UDP is not acknowledged by WLED. Streaming may replace other effects on affected controllers.
+     */
+    private void liveEffectControls(List<SegmentZone.Member> members, String title) {
+        if (members == null || members.isEmpty()) { notifyStatus("Choose a segment or zone first"); return; }
+        if (udp.active()) { udpControls(); return; }
+        final int[] colors = {0xFFFFA500,0xFFFFFFFF,0xFFFF3344,0xFF43AEFF,
+                0xFFAA66FF,0xFF3ADB81,0xFF000010,0xFF000000};
+        final String[] names = {"Amber","White","Red","Blue","Purple","Green","Dim navy","Off"};
+        final String[] effects = {"Chase / Comet","Color Wipe","Rainbow Flow","Pulse / Breathe","Sparkle"};
+        final int[] primary={0},secondary={6};
+        LinearLayout body=vertical();pad(body,16);
+        body.addView(label("Choose a live effect and optional colors. It runs locally on this Android device; " +
+                "no computer or cloud server is required.",12,MUTED));
+        Spinner picker=new Spinner(this);
+        ArrayAdapter<String> choices=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,effects);
+        picker.setAdapter(choices);
+        body.addView(label("Effect",14,WHITE));
+        body.addView(picker,new LinearLayout.LayoutParams(-1,dp(52)));
+        Button first=button("Primary: Amber  ▾",()->{});
+        Button second=button("Secondary: Dim navy  ▾",()->{});
+        body.addView(first,new LinearLayout.LayoutParams(-1,dp(50)));
+        body.addView(second,new LinearLayout.LayoutParams(-1,dp(50)));
+        body.addView(label("Speed",14,WHITE));
+        SeekBar speed=new SeekBar(this);speed.setMax(100);speed.setProgress(50);
+        body.addView(speed,new LinearLayout.LayoutParams(-1,dp(48)));
+        body.addView(label("Brightness · 25% initial",14,WHITE));
+        SeekBar brightness=new SeekBar(this);brightness.setMax(100);brightness.setProgress(25);
+        body.addView(brightness,new LinearLayout.LayoutParams(-1,dp(48)));
+        TextView summary=label("UDP 21324 · ~15 FPS · 90-second auto-stop. Packet delivery not acknowledged.",12,MUTED);
+        body.addView(summary);
+        body.addView(label("CAUTION: WLED realtime streaming may interrupt other effects on EVERY " +
+                "selected controller, even outside the selected segment. GlowDeck saves and attempts to restore " +
+                "the previous state after stopping. Keep this screen open.",12,0xFFFFC46D));
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(false);scroll.addView(body);
+        final LiveEffectEngine.Settings[] current={new LiveEffectEngine.Settings(
+                LiveEffectEngine.Effect.CHASE,50,25,colors[0],colors[6])};
+        Runnable update=()->{
+            LiveEffectEngine.Effect effect=LiveEffectEngine.Effect.values()[picker.getSelectedItemPosition()<0?
+                    0:picker.getSelectedItemPosition()];
+            current[0]=new LiveEffectEngine.Settings(effect,Math.max(1,speed.getProgress()),
+                    Math.max(1,brightness.getProgress()),colors[primary[0]],colors[secondary[0]]);
+            if(udp.active() && udp.isLiveEffect())udp.updateLive(current[0]);
+        };
+        first.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Primary color")
+                .setItems(names,(dialog,i)->{primary[0]=i;first.setText("Primary: "+names[i]+"  ▾");update.run();}).show());
+        second.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Secondary color")
+                .setItems(names,(dialog,i)->{secondary[0]=i;second.setText("Secondary: "+names[i]+"  ▾");update.run();}).show());
+        picker.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+            @Override public void onItemSelected(AdapterView<?> v,View view,int position,long id){update.run();}
+            @Override public void onNothingSelected(AdapterView<?> parent){}
+        });
+        SeekBar.OnSeekBarChangeListener sliderChange=new SeekBar.OnSeekBarChangeListener(){
+            @Override public void onStartTrackingTouch(SeekBar v){}
+            @Override public void onProgressChanged(SeekBar v,int progress,boolean byUser){if(byUser)update.run();}
+            @Override public void onStopTrackingTouch(SeekBar v){update.run();}
+        };
+        speed.setOnSeekBarChangeListener(sliderChange);
+        brightness.setOnSeekBarChangeListener(sliderChange);
+        final boolean[] starting={false};
+        final AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Live Effects · "+title)
+                .setView(scroll).setPositiveButton("Start streaming",null)
+                .setNegativeButton("Close",(d,i)->{}).create();
+        dialog.setOnShowListener(d->{
+            Button action=dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            action.setOnClickListener(v->{
+                if (udp.active()) {dialog.dismiss();return;}
+                if (starting[0])return;
+                starting[0]=true;action.setEnabled(false);
+                update.run();
+                notifyStatus("Capturing WLED state before streaming…");
+                worker.execute(()->{
+                    if(preview.active())preview.stop();
+                    String result=udp.startLive(new ArrayList<>(members),new ArrayList<>(devices),current[0]);
+                    ui.post(()->{
+                        starting[0]=false;
+                        action.setEnabled(true);
+                        if(!dialog.isShowing() || stopped || isFinishing()){
+                            if(udp.active())stopUdp("Closing live effects");return;
+                        }
+                        summary.setText(result);
+                        notifyStatus(result);
+                        if(udp.active()){
+                            action.setText("Stop & restore");
+                            ui.removeCallbacks(udpTimeout);
+                            ui.removeCallbacks(udpStatus);
+                            ui.postDelayed(udpTimeout,90000);
+                            ui.postDelayed(udpStatus,1000);
+                            ui.postDelayed(()->{if(dialog.isShowing()&&udp.secondsRemaining()==0)dialog.dismiss();},90500);
+                        }
+                    });
+                });
+            });
+        });
+        dialog.setOnDismissListener(d->{
+            if (udp.active())stopUdp("Live effects stopped");
+        });
+        dialog.show();
+    }
+
     private void saveLayout(WledDevice d) {
         new AlertDialog.Builder(this).setTitle("Save WLED segment bounds")
                 .setMessage("Persist this controller's current layout to a WLED preset, with Save Segment Bounds enabled. Pick an unused preset ID (1–250). This may overwrite an existing preset of the same ID.")
