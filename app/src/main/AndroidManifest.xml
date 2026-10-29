@@ -12,6 +12,7 @@
         android:allowBackup="false"
         android:label="GlowDeck"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:banner="@drawable/tv_banner"
         android:theme="@style/GlowDeckTheme"
         android:usesCleartextTraffic="true"
