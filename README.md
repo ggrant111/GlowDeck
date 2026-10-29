@@ -1,3 +1,13 @@
+# GlowDeck v1.6.1 — Fire Tablet compatibility hotfix
+
+Version 1.6.1 (versionCode 9). Fixes a crash on older Fire OS devices caused by a call to unavailable `SeekBar.setMinHeight(int)` in `MainActivity.touchSeek`. Brightness, Speed, and Intensity sliders retain 48dp height from their existing layout parameters.
+
+**Upgrade:** Keep the same application package (`com.glowdeck.tv`) and install over the old app using the same signing certificate to preserve saved WLED controllers, groups, Favorites, and scenes. Do not uninstall simply to resolve this crash. APKs with different debug signing certificates may be incompatible.
+
+**Test:** See [Fire Tablet compatibility instructions](docs/FIRE_TABLET_COMPATIBILITY.md). Build/unit test success is not a substitute for physical Fire OS testing.
+
+---
+
 # GlowDeck v1.5 — Favorites & Shortcuts
 
 **Version:** 1.5.0 (Android application ID `com.glowdeck.tv`, versionCode 7). One APK for Fire TV, Android tablets, and phones.

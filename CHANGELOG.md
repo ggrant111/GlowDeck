@@ -1,5 +1,12 @@
 # Change log
 
+## v1.6.1 — Fire Tablet startup compatibility hotfix
+- Fix immediate launch crash on older Fire OS: remove unsupported `SeekBar.setMinHeight(int)` call from `MainActivity.touchSeek`.
+- Keep existing 48dp slider height via layout parameters; WLED controls otherwise unchanged.
+- Preserve local devices, groups, Favorites, and scenes during an in-place upgrade signed with the same key.
+- Update Android versionCode to 9 and versionName to 1.6.1; add Fire Tablet acceptance test guide.
+
+
 ## v1.6.0 — Multi-Device Scene Builder
 - Create independent GlowDeck scenes by capturing actual WLED states from selected controllers.
 - Edit each scene light offline: on/off, brightness, colors, effects, re-capture, add/remove controllers.
