@@ -1,19 +1,30 @@
 # Change log
 
-## v1.6.2 — Verified WLED command status
-- Show immediate, nonblocking in-app notifications for queued, sent/awaiting verification, confirmed and not confirmed/failed commands.
-- After WLED state changes, read the device to verify requested power, brightness, effect, color, segment and preset state.
-- Read `/presets.json` to verify a preset save operation.
-- Cover main controls, Favorites, groups and multi-device scene activation; report partial confirmations.
-- Retry GET reads without resending mutations. Do not infer successful changes from HTTP acknowledgement alone.
-- Preserve the v1.6.1 Fire OS startup fix, existing WLED features and stored configurations.
-- Add unit tests and device acceptance checklist.
+## v1.6.3 — Effect-aware independent color pickers
+- Load WLED 0.14+ `/json/fxdata` effect metadata and show only usable Fx, Bg, Cs slots; older versions use the legacy three-color fallback.
+- Touch dashboards and Fire TV now have individual slot pickers and an RGB editor; quick colors modify the selected slot.
+- Preserve active effect, palette, other color slots, and RGBW white channels when changing one color.
+- Send complete segment color arrays to `/json/state` without setting `fx=0`; preserve v1.6.2 send/check/confirm feedback.
+- Scene color editing now has individual slots and preserves selected effect.
+- Add unit tests for metadata flags, slot preservation, and saved-scene effect preservation.
+
+
+## v1.6.2 — Live command feedback and verified WLED state
+- Immediately show a nonblocking in-app command banner on TV, tablet, and phone: Request queued → Request sent, checking WLED → Confirmed, not confirmed, or failed.
+- Confirm device state through independent WLED JSON API reads following each HTTP POST; never equate HTTP 2xx with verified state.
+- Apply verification to every state-changing main control, WLED preset save, Favorite and multi-device GlowDeck scene.
+- Verify per-segment state, power, brightness, effects, palettes, color, speed/intensity and WLED preset state; saved presets are checked using `/presets.json`.
+- Retry read-only verification up to four times for WLED transition and device response delays, never resend commands automatically.
+- Surface partial success and indeterminate outcome distinctly from failures. Serial command queue remains intact and stale notifications cannot overwrite more recent actions.
+- Preserve Fire OS `SeekBar` compatibility fix from v1.6.1 and all stored app settings.
+
 
 ## v1.6.1 — Fire Tablet startup compatibility hotfix
-- Fix immediate launch crash on older Fire OS: remove unsupported `SeekBar.setMinHeight(int)` call from `MainActivity.touchSeek`.
-- Keep existing 48dp slider height via layout parameters; WLED controls otherwise unchanged.
-- Preserve local devices, groups, Favorites, and scenes during an in-place upgrade signed with the same key.
-- Update Android versionCode to 9 and versionName to 1.6.1; add Fire Tablet acceptance test guide.
+- Fix crash immediately after launch on older Fire OS / Android versions: removed unsupported `SeekBar.setMinHeight(int)` invocation in `MainActivity.touchSeek`.
+- Slider retains its 48dp height via the existing layout parameter. Brightness, Speed and Intensity control behavior is otherwise unchanged.
+- Preserve package ID and locally saved device, group, favorite and scene settings during same-signature upgrades.
+- Increase Android versionCode to 9 and versionName to 1.6.1.
+- Add reproducible Fire Tablet ADB verification instructions.
 
 
 ## v1.6.0 — Multi-Device Scene Builder
