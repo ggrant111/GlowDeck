@@ -1,5 +1,16 @@
 # Change log
 
+## v1.6.0 — Multi-Device Scene Builder
+- Create independent GlowDeck scenes by capturing actual WLED states from selected controllers.
+- Edit each scene light offline: on/off, brightness, colors, effects, re-capture, add/remove controllers.
+- Play scenes across devices with explicit state, per-segment IDs and effect/palette name mapping; skip unsupported settings and report partial failure.
+- Prevent unintended WLED broadcast synchronization while applying distinct scene looks; transitions are per-command.
+- Use stable WLED device IDs where available, falling back to MAC and host to prevent control of the wrong light.
+- Link multi-device scenes as existing one-tap Favorites; add Scenes section on Fire TV, tablet, and phone.
+- Persist scenes independently from controller presets, with backwards-compatible local configuration.
+- Add JVM tests covering capture, serialization, safe editing, cross-firmware mapping and partial failure.
+- Cloud sync and Android widgets remain future v1.7/v1.8 work.
+
 ## v1.5.0 — Favorites & One-Tap Shortcuts
 - Added actionable shortcuts for explicit power, brightness, solid color, WLED presets.
 - Separate Favorites UI for Fire TV, tablet and phone. Replace TV shortcut strip with Favorites without increasing vertical footprint.

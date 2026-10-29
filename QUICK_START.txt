@@ -1,4 +1,4 @@
-GlowDeck v1.4 — TV / Android tablet / Android phone
+GlowDeck v1.6 — TV / Android tablet / Android phone
 
 Open GlowDeckTV in Android Studio > Build APK(s).
 Android phone/tablet: install app/build/outputs/apk/debug/app-debug.apk

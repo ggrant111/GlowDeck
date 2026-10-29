@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 echo.
 echo =========================================
-echo        GlowDeck v1.4 - Fire TV Build / Install
+echo        GlowDeck v1.6 - Fire TV Build / Install
 echo =========================================
 echo.
 set "TVIP=192.168.1.24"

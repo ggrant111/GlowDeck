@@ -10,8 +10,8 @@ android {
         applicationId 'com.glowdeck.tv'
         minSdk 23
         targetSdk 32 // Fire TV sideload compatibility; review before any store release.
-        versionCode 7
-        versionName '1.5.0'
+        versionCode 8
+        versionName '1.6.0'
     }
 
     compileOptions {
@@ -26,7 +26,7 @@ android {
     }
 }
 
-// Pure JVM tests for serialized favorites and WLED action generation.
+// Pure JVM tests for Favorites, GlowDeck scenes, and WLED commands.
 dependencies {
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
