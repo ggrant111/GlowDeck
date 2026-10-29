@@ -1,12 +1,21 @@
 # Change log
 
+## v1.7.0 — Segment Studio & multi-device zones
+- Physical segment discovery and non-overlapping split/create/resize/rename/delete controls.
+- Multi-controller zones targeting individual WLED segment IDs and boundaries.
+- Temporary amber physical LED identification with stop, timeout, and recovery snapshots.
+- Per-segment effects, palette, brightness, Fx/Bg/Cs colors, power and speed/intensity.
+- Android TV and tablet navigation access, phone More entry; continued v1.6.3 color features.
+- Optional explicit preset save with WLED segment bounds.
+- See docs/V1_7_SEGMENT_STUDIO.md for limitations and hardware acceptance testing.
+
+
 ## v1.6.3 — Effect-aware independent color pickers
 - Load WLED 0.14+ `/json/fxdata` effect metadata and show only usable Fx, Bg, Cs slots; older versions use the legacy three-color fallback.
 - Touch dashboards and Fire TV now have individual slot pickers and an RGB editor; quick colors modify the selected slot.
 - Preserve active effect, palette, other color slots, and RGBW white channels when changing one color.
 - Send complete segment color arrays to `/json/state` without setting `fx=0`; preserve v1.6.2 send/check/confirm feedback.
 - Scene color editing now has individual slots and preserves selected effect.
-- Existing color Favorites now change primary Fx color without forcibly resetting the effect to Solid.
 - Add unit tests for metadata flags, slot preservation, and saved-scene effect preservation.
 
 

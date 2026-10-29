@@ -323,7 +323,7 @@ public class MainActivity extends Activity {
         navList.removeAllViews();
         String[][] entries = {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
-                {"scenes", "Scenes"}, {"effects", "Effects"}, {"presets", "Presets"},
+                {"scenes", "Scenes"}, {"segments", "Segments"}, {"effects", "Effects"}, {"presets", "Presets"},
                 {"settings", "Settings"}
         };
         for (String[] entry : entries) {
@@ -345,11 +345,12 @@ public class MainActivity extends Activity {
             item.addView(label, sized(-1, 18));
             item.setOnClickListener(v -> {
                 if (entry[0].equals("home")) closeDrawer();
+                else if (entry[0].equals("segments")) openSegmentStudio();
                 else openDrawer(entry[0]);
             });
             setRailFocus(item, active);
-            navList.addView(item, sized(-1, 53));
-            navList.addView(space(1, 5));
+            navList.addView(item, sized(-1, 48));
+            navList.addView(space(1, 3));
         }
     }
 
@@ -404,6 +405,11 @@ public class MainActivity extends Activity {
                         if (i == 0) star.moveTo(x, y); else star.lineTo(x, y);
                     }
                     star.close(); c.drawPath(star, pen); break;
+                }
+                case "segments": {
+                    for (int i=0;i<3;i++) c.drawRoundRect(-12+i*8,-10, -6+i*8,10,2,2,pen);
+                    c.drawLine(-12,-13,12,-13,pen);c.drawLine(-12,13,12,13,pen);
+                    break;
                 }
                 case "scenes": {
                     for (int row = 0; row < 2; row++) for (int col = 0; col < 2; col++) {
@@ -528,7 +534,7 @@ public class MainActivity extends Activity {
         } : new String[][] {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
                 {"scenes", "Scenes"}, {"effects", "Effects"},
-                {"presets", "Presets"}, {"groups", "Groups"}, {"settings", "More"}
+                {"presets", "Presets"}, {"segments", "Segments"}, {"settings", "More"}
         };
         for (String[] entry : items) {
             boolean active = activeDrawer.equals(entry[0]) ||
@@ -550,6 +556,7 @@ public class MainActivity extends Activity {
             item.setOnClickListener(v -> {
                 if ("home".equals(entry[0])) { if (drawerOverlay != null) dismissAllDrawers();
                     if (touchScroll != null) touchScroll.smoothScrollTo(0, 0); }
+                else if (entry[0].equals("segments")) openSegmentStudio();
                 else openDrawer(entry[0]);
             });
             setRailFocus(item, active);
@@ -1806,6 +1813,8 @@ public class MainActivity extends Activity {
 
     private void renderSettingsDrawer(LinearLayout list) {
         drawerInfo(list, "Advanced WLED options and app configuration.");
+        list.addView(drawerItem("▦  Segment Studio", "Build, identify and control LED segments across multiple lights",
+                "settings:segments", this::openSegmentStudio, false), lpBottom(7));
         list.addView(drawerItem("▦  Scenes", "Capture and coordinate several lights",
                 "settings:scenes", () -> openDrawer("scenes"), false), lpBottom(7));
         list.addView(drawerItem("★  Favorites", "Pin and manage one-tap lighting actions",
@@ -1818,8 +1827,8 @@ public class MainActivity extends Activity {
                 () -> openDrawer("palettes"), false), lpBottom(7));
         WledDevice d = currentDevice();
         if (!multiTarget() && d != null) {
-            if (d.segments.size() > 1) list.addView(drawerItem("▦  LED segments", "Select a segment", "drawer:segments",
-                    this::showSegments, false), lpBottom(7));
+            if (d.segments.size() > 1) list.addView(drawerItem("▦  LED segments", "Choose a segment or open Segment Studio", "drawer:segments",
+                    this::openSegmentStudio, false), lpBottom(7));
             list.addView(drawerItem("⚙  Manage " + d.name(), "Rename, remove or refresh", "drawer:manage",
                     this::showManageDialog, false), lpBottom(7));
         }
@@ -1829,7 +1838,7 @@ public class MainActivity extends Activity {
                 this::showAddDialog, false), lpBottom(7));
         list.addView(drawerItem("↻  Refresh status", "Read current state from every WLED device", "drawer:refresh",
                 () -> { refreshAll(); toast("Refreshing device status"); }, false), lpBottom(7));
-        drawerInfo(list, "GlowDeck v1.4  ·  Local network control  ·  TV, tablet and phone");
+        drawerInfo(list, "GlowDeck v1.7  ·  Local network control  ·  TV, tablet and phone");
     }
 
     private static final class SavedGroup {
@@ -2368,6 +2377,10 @@ public class MainActivity extends Activity {
             d.loadedPresets = false;
             ui.postDelayed(() -> requestPresets(d), 1800);
         });
+    }
+
+    private void openSegmentStudio() {
+        startActivity(new android.content.Intent(this, SegmentStudioActivity.class));
     }
 
     private void showSegments() {
@@ -2986,7 +2999,7 @@ public class MainActivity extends Activity {
         if (drawerOverlay != null) return routeDrawerDpad(current, code);
         String tag = focusedTag();
         if (tag != null && tag.startsWith("nav:")) {
-            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:scenes",
+            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:scenes", "nav:segments",
                     "nav:effects", "nav:presets", "nav:settings"};
             int index = 0;
             for (int i = 0; i < nav.length; i++) if (nav[i].equals(tag)) index = i;

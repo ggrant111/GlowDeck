@@ -1,10 +1,16 @@
+# GlowDeck v1.7.0 — Segment Studio & multi-device zones
+
+**Android versionCode 12.** Create and control individual physical WLED segments, identify LED ranges visually, and combine segments across controllers into a GlowDeck zone. TV and tablet users open **Segments**; phone users open **More → Segment Studio**. See [documentation](docs/V1_7_SEGMENT_STUDIO.md).
+
+Device/zone storage remains local. No cloud sync or Android home widgets have been added yet. Physical-device tests are required.
+
+---
+
 # GlowDeck v1.6.3 — Effect-aware color slots
 
 **Version 1.6.3 (versionCode 11).** Fixes the WLED effect-color workflow: choosing any color no longer switches your chosen effect to Solid. Select separate Fx (primary), Bg (background), or Cs (tertiary) pickers where the WLED effect supports them, then adjust using quick colors or a custom RGB picker. You can change each slot independently while keeping its other colors and RGBW white values.
 
 **WLED integration:** Reads metadata from `GET /json/fxdata` for WLED 0.14+ and parses the second semicolon-separated section to determine active color slots. Older WLED devices use legacy three-color controls. Color updates send only `on` and `seg[].col` to `POST /json/state` (no `fx` or palette changes). A palette-driven effect may not visibly respond to manual color slots even though the WLED controller confirms the stored setting; change palette if needed.
-
-**Favorites:** Existing quick-color Favorites now modify primary Fx color while retaining the current effect.
 
 **Scene editing:** Color edits to saved scenes now preserve effects; no live lighting changes until Play. Full-color RGB edit and quick swatches work with separate slots.
 
