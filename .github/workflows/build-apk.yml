@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main, feature/v1.6.2-command-feedback, feature/v1.6.3-effect-colors]
+    branches: [main, feature/v1.6.2-command-feedback, feature/v1.6.3-effect-colors, feature/v1.7-segment-studio]
   workflow_dispatch:
 
 permissions:
@@ -39,6 +39,6 @@ jobs:
       - name: Upload installable debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: GlowDeck-v1.6.3-effect-colors-debug-apk
+          name: GlowDeck-v1.7-segment-studio-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

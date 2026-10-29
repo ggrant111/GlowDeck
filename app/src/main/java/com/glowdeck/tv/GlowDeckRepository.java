@@ -47,6 +47,27 @@ final class GlowDeckRepository {
         legacy.edit().putString("custom_groups_v12", json).apply();
     }
 
+    List<SegmentZone> loadZones() {
+        List<SegmentZone> result = new ArrayList<>();
+        try {
+            JSONObject saved=new JSONObject(shared.getString("zones_v17","{}"));
+            if(saved.optInt("schema",1)!=1)return result;
+            JSONArray items=saved.optJSONArray("items");
+            if(items!=null)for(int i=0;i<items.length() && result.size()<50;i++) {
+                SegmentZone z=SegmentZone.fromJson(items.optJSONObject(i));
+                if(z!=null)result.add(z);
+            }
+        }catch(JSONException ignored){}
+        return result;
+    }
+    void saveZones(List<SegmentZone> zones) {
+        JSONArray array=new JSONArray();
+        for(SegmentZone z:zones)try{array.put(z.toJson());}catch(JSONException ignored){}
+        JSONObject output=new JSONObject();
+        try{output.put("schema",1).put("items",array);}catch(JSONException ignored){}
+        shared.edit().putString("zones_v17",output.toString()).apply();
+    }
+
     List<GlowScene> loadScenes() {
         List<GlowScene> scenes = new ArrayList<>();
         Set<String> ids = new HashSet<>();
