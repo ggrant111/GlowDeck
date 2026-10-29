@@ -143,6 +143,9 @@ final class WledDevice {
         final boolean on;
         final int effect;
         JSONArray colors;
+        Segment(int id, String name, boolean on) {
+            this(id, name, on, 0, new JSONArray());
+        }
         Segment(int id, String name, boolean on, int effect, JSONArray colors) {
             this.id = id; this.name = name; this.on = on;
             this.effect = effect;
