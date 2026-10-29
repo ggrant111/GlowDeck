@@ -1,0 +1,33 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.glowdeck.tv'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.glowdeck.tv'
+        minSdk 23
+        targetSdk 32 // Fire TV sideload compatibility; review before any store release.
+        versionCode 8
+        versionName '1.6.0'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+// Pure JVM tests for Favorites, GlowDeck scenes, and WLED commands.
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}
