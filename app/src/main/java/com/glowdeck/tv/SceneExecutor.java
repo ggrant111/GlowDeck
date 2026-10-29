@@ -60,7 +60,7 @@ final class SceneExecutor {
     static WledDevice findDevice(GlowScene.Target target, List<WledDevice> devices) {
         for (WledDevice d : devices) if (target.deviceId.equals(d.identity())) return d;
         for (WledDevice d : devices) if (target.lastHost.equalsIgnoreCase(d.host) &&
-                (target.deviceId.startsWith("host:") || d.deviceId.isEmpty())) return d;
+                (target.deviceId.startsWith("host:") || d.identity().startsWith("host:"))) return d;
         return null;
     }
 
