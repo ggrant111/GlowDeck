@@ -33,9 +33,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-          # This project bundles a small custom bootstrap JAR, not the official Gradle wrapper.
-          # CI uses the setup-gradle provisioned Gradle binary, not the bundled bootstrap JAR.
-          validate-wrappers: false
+          validate-wrappers: true
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload installable debug APK
