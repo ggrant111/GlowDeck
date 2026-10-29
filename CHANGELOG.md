@@ -6,6 +6,7 @@
 - Preserve active effect, palette, other color slots, and RGBW white channels when changing one color.
 - Send complete segment color arrays to `/json/state` without setting `fx=0`; preserve v1.6.2 send/check/confirm feedback.
 - Scene color editing now has individual slots and preserves selected effect.
+- Existing color Favorites now change primary Fx color without forcibly resetting the effect to Solid.
 - Add unit tests for metadata flags, slot preservation, and saved-scene effect preservation.
 
 

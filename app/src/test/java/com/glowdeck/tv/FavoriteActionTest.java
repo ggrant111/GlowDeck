@@ -48,7 +48,8 @@ public class FavoriteActionTest {
         assertEquals(255, rgb.getInt(0));
         assertEquals(0, rgb.getInt(1));
         assertEquals(34, rgb.getInt(2));
-        assertEquals(0, segments.getJSONObject(0).getInt("fx"));
+        assertFalse(segments.getJSONObject(0).has("fx"));
+        assertEquals(0, segments.getJSONObject(0).getJSONArray("col").getJSONArray(1).getInt(0));
     }
 
     @Test public void presetsMapByNameAcrossDevices() throws Exception {

@@ -4,6 +4,8 @@
 
 **WLED integration:** Reads metadata from `GET /json/fxdata` for WLED 0.14+ and parses the second semicolon-separated section to determine active color slots. Older WLED devices use legacy three-color controls. Color updates send only `on` and `seg[].col` to `POST /json/state` (no `fx` or palette changes). A palette-driven effect may not visibly respond to manual color slots even though the WLED controller confirms the stored setting; change palette if needed.
 
+**Favorites:** Existing quick-color Favorites now modify primary Fx color while retaining the current effect.
+
 **Scene editing:** Color edits to saved scenes now preserve effects; no live lighting changes until Play. Full-color RGB edit and quick swatches work with separate slots.
 
 **Feedback:** v1.6.2 command sent/confirmed banners remain in effect; all requests are verified against the controller's reported state.
