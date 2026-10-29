@@ -116,6 +116,8 @@ public class MainActivity extends Activity {
     private boolean touchNavAtBottom;
     private ScrollView touchScroll;
     private final List<SavedGroup> savedGroups = new ArrayList<>();
+    private final List<Favorite> favorites = new ArrayList<>();
+    private GlowDeckRepository store;
     private float uiScale = 1f; // Keep the entire dashboard inside the TV viewport.
     private NsdManager nsd;
     private NsdManager.DiscoveryListener discoveryListener;
@@ -131,6 +133,8 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         chooseDisplayMode();
+        store = new GlowDeckRepository(this, getPreferences(MODE_PRIVATE));
+        favorites.addAll(store.loadFavorites());
         loadDevices();
         loadGroups();
         buildCurrentShell();
@@ -208,7 +212,7 @@ public class MainActivity extends Activity {
     }
 
     private void loadDevices() {
-        String json = getPreferences(MODE_PRIVATE).getString("devices", null);
+        String json = store.readDevices();
         if (json == null) {
             // First-use convenience: the user's previously configured Fireplace WLED.
             devices.add(new WledDevice("192.168.1.71", "Fireplace"));
@@ -236,7 +240,7 @@ public class MainActivity extends Activity {
             catch (JSONException ignored) { }
             array.put(entry);
         }
-        getPreferences(MODE_PRIVATE).edit().putString("devices", array.toString()).apply();
+        store.saveDevices(array.toString());
     }
 
     /** TV shell: permanent compact icon rail, full-width content and modal slide-out drawers. */
@@ -306,7 +310,7 @@ public class MainActivity extends Activity {
         if (!tvMode) { renderTouchNavigation(); return; }
         navList.removeAllViews();
         String[][] entries = {
-                {"home", "Home"}, {"devices", "Lights"}, {"scenes", "Scenes"},
+                {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
                 {"effects", "Effects"}, {"presets", "Presets"}, {"groups", "Groups"},
                 {"settings", "Settings"}
         };
@@ -378,6 +382,17 @@ public class MainActivity extends Activity {
                     c.drawLine(-5, 3, -4, 8, pen); c.drawLine(5, 3, 4, 8, pen);
                     c.drawLine(-4, 9, 4, 9, pen); c.drawLine(-3, 12, 3, 12, pen); break;
                 }
+                case "favorites": {
+                    Path star = new Path();
+                    for (int i = 0; i < 10; i++) {
+                        double a = Math.PI * (-0.5 + i / 5.0);
+                        float r = (i % 2 == 0) ? 12 : 5.4f;
+                        float x = (float) (r * Math.cos(a));
+                        float y = (float) (r * Math.sin(a));
+                        if (i == 0) star.moveTo(x, y); else star.lineTo(x, y);
+                    }
+                    star.close(); c.drawPath(star, pen); break;
+                }
                 case "scenes": {
                     for (int row = 0; row < 2; row++) for (int col = 0; col < 2; col++) {
                         float x = -10 + col * 12, y = -10 + row * 12;
@@ -439,7 +454,7 @@ public class MainActivity extends Activity {
         if (d != null) requestPresets(d);
     }
 
-    // ---------- Adaptive Android tablet / phone UI (v1.4) ----------
+    // ---------- Adaptive Android tablet / phone UI (v1.5) ----------
     // TV uses the unchanged remote-first shell. Touch uses a scrollable dashboard,
     // an icon rail on tablets, and compact bottom navigation on phones.
     private void buildTouchShell() {
@@ -496,10 +511,10 @@ public class MainActivity extends Activity {
     private void renderTouchNavigation() {
         navList.removeAllViews();
         String[][] items = touchNavAtBottom ? new String[][] {
-                {"home", "Home"}, {"devices", "Lights"}, {"effects", "Effects"},
+                {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Faves"},
                 {"presets", "Presets"}, {"settings", "More"}
         } : new String[][] {
-                {"home", "Home"}, {"devices", "Lights"}, {"scenes", "Scenes"},
+                {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
                 {"effects", "Effects"}, {"presets", "Presets"},
                 {"groups", "Groups"}, {"settings", "More"}
         };
@@ -580,6 +595,8 @@ public class MainActivity extends Activity {
             controlList.addView(empty);
             return;
         }
+        addTouchFavorites(controlList);
+        controlList.addView(space(1, 12));
         if (twoColumns) {
             LinearLayout columns = horizontal(Gravity.TOP);
             LinearLayout left = vertical(), right = vertical();
@@ -607,6 +624,184 @@ public class MainActivity extends Activity {
             addTouchAnimation(controlList, device);
         }
         if (touchScroll != null && y != 0) touchScroll.post(() -> touchScroll.scrollTo(0, y));
+    }
+
+    /** One-tap favorites are available in the main dashboard on every device type. */
+    private void addTouchFavorites(LinearLayout parent) {
+        LinearLayout card = touchCard("★  FAVORITES", "Manage  ›", () -> openDrawer("favorites"));
+        if (favorites.isEmpty()) {
+            card.addView(text("Keep your most-used lighting actions here.", 13, MUTED, false));
+            card.addView(space(1, 9));
+            card.addView(button("+ Add first favorite", "favorite:add:home", this::addFavoriteDialog, true),
+                    sized(-1, 49));
+        } else {
+            int columns = touchNavAtBottom ? 2 : 3;
+            for (int i = 0; i < Math.min(6, favorites.size()); i += columns) {
+                LinearLayout row = horizontal(Gravity.CENTER_VERTICAL);
+                for (int j = 0; j < columns && i + j < Math.min(6, favorites.size()); j++) {
+                    Favorite favorite = favorites.get(i + j);
+                    TextView action = button("★  " + favorite.name, "favorite:" + favorite.id,
+                            () -> runFavorite(favorite), false);
+                    action.setContentDescription("Run " + favorite.name + " on " + targetDescription(favorite.target));
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1f);
+                    if (j > 0) lp.leftMargin = dp(7);
+                    row.addView(action, lp);
+                }
+                card.addView(row);
+                if (i + columns < Math.min(6, favorites.size())) card.addView(space(1, 8));
+            }
+        }
+        parent.addView(card, sized(-1, -2));
+    }
+
+    private String targetDescription(String target) {
+        if ("*".equals(target)) return "all lights";
+        if (target.startsWith("@g:")) for (SavedGroup group : savedGroups) {
+            if (target.equals("@g:" + group.id)) return group.name;
+        }
+        for (WledDevice d : devices) if (d.host.equals(target)) return d.name();
+        return "missing device or group";
+    }
+
+    private void renderFavoritesDrawer(LinearLayout list, LinearLayout sheet) {
+        drawerInfo(list, "Tap or press OK to run. Add uses the currently selected light or group: " + selectedName());
+        if (favorites.isEmpty()) drawerInfo(list, "No favorites yet. Add a power, color, brightness, or preset shortcut.");
+        for (int i = 0; i < favorites.size(); i++) {
+            Favorite f = favorites.get(i);
+            list.addView(drawerItem("★  " + f.name, f.detail() + "  ·  " + targetDescription(f.target),
+                    i == 0 ? "drawer:first" : "favorite:run:" + f.id,
+                    () -> { dismissAllDrawers(); runFavorite(f); }, false), lpBottom(4));
+            list.addView(button("Edit / reorder  ·  " + f.name, "favorite:edit:" + f.id,
+                    () -> showFavoriteActions(f), false), lpBottom(11));
+        }
+        sheet.addView(space(1, 8));
+        sheet.addView(button("+ Add favorite", "favorite:add", this::addFavoriteDialog, true), sized(-1, tvMode ? 43 : 49));
+    }
+
+    private void addFavoriteDialog() {
+        if (devices.isEmpty()) { toast("Add a WLED device first"); return; }
+        final String target = selectedHost;
+        final WledDevice d = currentDevice();
+        final String targetLabel = selectedName();
+        new AlertDialog.Builder(this).setTitle("Add favorite for " + targetLabel)
+                .setItems(new String[]{"Power ON", "Power OFF", "Set brightness", "Set quick color", "WLED preset"},
+                        (dialog, choice) -> {
+                            if (choice == 0) nameAndSaveFavorite(target, Favorite.POWER, 1, "", -1, targetLabel + " On");
+                            else if (choice == 1) nameAndSaveFavorite(target, Favorite.POWER, 0, "", -1, targetLabel + " Off");
+                            else if (choice == 2) {
+                                int[] levels = {25, 50, 75, 100};
+                                new AlertDialog.Builder(this).setTitle("Brightness • " + targetLabel)
+                                        .setItems(new String[]{"25%", "50%", "75%", "100%"}, (unused, idx) -> {
+                                            int level = Math.max(1, Math.round(levels[idx] * 255f / 100f));
+                                            nameAndSaveFavorite(target, Favorite.BRIGHTNESS, level, "", -1,
+                                                    targetLabel + " " + levels[idx] + "%");
+                                        }).setNegativeButton("Cancel", null).show();
+                            } else if (choice == 3) {
+                                new AlertDialog.Builder(this).setTitle("Quick color • " + targetLabel)
+                                        .setItems(COLOR_NAMES, (unused, idx) -> nameAndSaveFavorite(target,
+                                                Favorite.COLOR, COLOR_VALUES[idx] & 0xFFFFFF, "", -1,
+                                                targetLabel + " " + COLOR_NAMES[idx]))
+                                        .setNegativeButton("Cancel", null).show();
+                            } else {
+                                if (d == null || d.presets.isEmpty()) {
+                                    if (d != null) requestPresets(d);
+                                    toast("Presets are loading. Try again when your WLED presets appear.");
+                                    return;
+                                }
+                                String[] names = new String[d.presets.size()];
+                                for (int i = 0; i < names.length; i++) names[i] = d.presets.get(i).name;
+                                new AlertDialog.Builder(this).setTitle("Favorite WLED preset")
+                                        .setItems(names, (unused, idx) -> {
+                                            WledDevice.Preset preset = d.presets.get(idx);
+                                            nameAndSaveFavorite(target, Favorite.PRESET, 0,
+                                                    preset.name, preset.id, preset.name);
+                                        }).setNegativeButton("Cancel", null).show();
+                            }
+                        }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void nameAndSaveFavorite(String target, String kind, int value,
+                                     String presetName, int presetId, String suggestedName) {
+        if (favorites.size() >= 50) { toast("Maximum 50 favorites. Remove an old one first."); return; }
+        askText("Name this favorite", "e.g. Movie Night", suggestedName, name -> {
+            String label = name.trim();
+            if (label.isEmpty()) { toast("Favorite name cannot be blank"); return; }
+            if (label.length() > 48) label = label.substring(0, 48);
+            Favorite favorite = Favorite.create(label, target, kind, value, presetName, presetId);
+            favorites.add(favorite);
+            saveAndShowFavorites();
+            toast("Saved ★ " + favorite.name);
+        });
+    }
+
+    private void showFavoriteActions(Favorite favorite) {
+        new AlertDialog.Builder(this).setTitle(favorite.name)
+                .setItems(new String[]{"Run now", "Rename", "Move up", "Move down", "Remove"}, (dialog, which) -> {
+                    int pos = favorites.indexOf(favorite);
+                    if (pos < 0) return;
+                    if (which == 0) { dismissAllDrawers(); runFavorite(favorite); return; }
+                    if (which == 1) {
+                        askText("Rename favorite", "Favorite name", favorite.name, text -> {
+                            if (text.trim().isEmpty()) return;
+                            int index = favorites.indexOf(favorite);
+                            if (index < 0) return;
+                            String label = text.trim();
+                            favorites.set(index, favorite.renamed(label.length() > 48 ? label.substring(0, 48) : label));
+                            saveAndShowFavorites();
+                        });
+                        return;
+                    }
+                    if (which == 2 && pos > 0) Collections.swap(favorites, pos, pos - 1);
+                    if (which == 3 && pos < favorites.size() - 1) Collections.swap(favorites, pos, pos + 1);
+                    if (which == 4) {
+                        new AlertDialog.Builder(this).setTitle("Remove " + favorite.name + "?")
+                                .setMessage("Only the shortcut is removed; your WLED device and presets are unchanged.")
+                                .setPositiveButton("Remove", (d, w) -> {
+                                    favorites.remove(favorite); saveAndShowFavorites();
+                                }).setNegativeButton("Cancel", null).show();
+                        return;
+                    }
+                    saveAndShowFavorites();
+                }).show();
+    }
+
+    private void saveAndShowFavorites() {
+        store.saveFavorites(favorites);
+        render();
+        if (drawerOverlay != null && "favorites".equals(activeDrawer)) showDrawer();
+    }
+
+    private List<WledDevice> favoriteTargets(Favorite favorite) {
+        List<WledDevice> result = new ArrayList<>();
+        if ("*".equals(favorite.target)) return new ArrayList<>(devices);
+        if (favorite.target.startsWith("@g:")) {
+            for (SavedGroup g : savedGroups) if (favorite.target.equals("@g:" + g.id)) {
+                for (WledDevice d : devices) if (g.hosts.contains(d.host)) result.add(d);
+                return result;
+            }
+            return result;
+        }
+        for (WledDevice d : devices) if (favorite.target.equals(d.host)) result.add(d);
+        return result;
+    }
+
+    private void runFavorite(Favorite favorite) {
+        List<WledDevice> target = favoriteTargets(favorite);
+        if (target.isEmpty()) { toast("Favorite unavailable: " + targetDescription(favorite.target)); return; }
+        message = "Activating " + favorite.name + "…";
+        refreshVisibleState();
+        network.execute(() -> {
+            ActionDispatcher.Result result = ActionDispatcher.execute(favorite, target, WledApi::send);
+            ui.post(() -> {
+                String status = result.successful + "/" + target.size() + " lights updated";
+                if (result.unsupported > 0) status += ", " + result.unsupported + " unsupported";
+                if (!result.errors.isEmpty()) status += ", " + result.errors.size() + " offline/failed";
+                message = favorite.name + ": " + status;
+                toast(message);
+                refreshVisibleState();
+            });
+            for (WledDevice d : target) fetchDevice(d);
+        });
     }
 
     private void addTouchPower(LinearLayout parent, WledDevice d) {
@@ -926,22 +1121,23 @@ public class MainActivity extends Activity {
         LinearLayout sceneBar = horizontal(Gravity.CENTER_VERTICAL);
         sceneBar.setPadding(dp(9), dp(3), dp(8), dp(3));
         sceneBar.setBackground(shape(0xFF0F1A30, 11, BORDER, 1));
-        sceneBar.addView(text("SCENES", 10, MUTED, true), sized(62, -1));
-        if (device == null || device.presets.isEmpty()) {
-            TextView noPreset = text("Saved WLED presets appear here", 11, MUTED, false);
-            sceneBar.addView(noPreset, new LinearLayout.LayoutParams(0, -1, 1));
+        sceneBar.addView(text("★  FAVS", 10, MUTED, true), sized(69, -1));
+        if (favorites.isEmpty()) {
+            TextView noFavorites = text("Pin a lighting shortcut to get started", 11, MUTED, false);
+            sceneBar.addView(noFavorites, new LinearLayout.LayoutParams(0, -1, 1));
         } else {
-            for (int i = 0; i < Math.min(3, device.presets.size()); i++) {
-                WledDevice.Preset preset = device.presets.get(i);
-                TextView chip = button("✧ " + preset.name, "scene:" + preset.id,
-                        () -> applyPreset(preset), !multi && device.currentPreset == preset.id);
+            for (int i = 0; i < Math.min(3, favorites.size()); i++) {
+                Favorite favorite = favorites.get(i);
+                TextView chip = button("★ " + favorite.name, "favorite:" + favorite.id,
+                        () -> runFavorite(favorite), false);
+                chip.setContentDescription("Run favorite " + favorite.name + " on " + targetDescription(favorite.target));
                 LinearLayout.LayoutParams chipLp = new LinearLayout.LayoutParams(0, dp(38), 1);
                 chipLp.leftMargin = dp(6);
                 sceneBar.addView(chip, chipLp);
             }
         }
         sceneBar.addView(space(7, 1));
-        sceneBar.addView(button("All  ›", "scene:all", () -> openDrawer("scenes"), false), sized(78, 36));
+        sceneBar.addView(button("Manage ›", "favorite:manage", () -> openDrawer("favorites"), false), sized(94, 36));
         controlList.addView(sceneBar, sized(-1, 51));
     }
 
@@ -1070,6 +1266,7 @@ public class MainActivity extends Activity {
         scrolling.addView(list);
         if (activeDrawer.equals("devices")) renderDevicesDrawer(list, sheet);
         else if (activeDrawer.equals("effects")) renderEffectsDrawer(list);
+        else if (activeDrawer.equals("favorites")) renderFavoritesDrawer(list, sheet);
         else if (activeDrawer.equals("presets") || activeDrawer.equals("scenes")) renderPresetsDrawer(list, sheet);
         else if (activeDrawer.equals("groups")) renderGroupsDrawer(list, sheet);
         else if (activeDrawer.equals("palettes")) renderPalettesDrawer(list);
@@ -1089,6 +1286,7 @@ public class MainActivity extends Activity {
     private String drawerTitle() {
         switch (activeDrawer) {
             case "devices": return "Your lights";
+            case "favorites": return "Favorites";
             case "effects": return "Effects";
             case "presets": return "Presets";
             case "scenes": return "Scenes · WLED presets";
@@ -1209,6 +1407,8 @@ public class MainActivity extends Activity {
 
     private void renderSettingsDrawer(LinearLayout list) {
         drawerInfo(list, "Advanced WLED options and app configuration.");
+        list.addView(drawerItem("★  Favorites", "Pin and manage one-tap lighting actions",
+                "settings:favorites", () -> openDrawer("favorites"), false), lpBottom(7));
         if (!tvMode) list.addView(drawerItem("◎  Groups", "Create and select collections of controllers", "settings:groups",
                 () -> openDrawer("groups"), false), lpBottom(7));
         list.addView(drawerItem("◉  Change device", selectedName(), "drawer:first",
@@ -1241,7 +1441,7 @@ public class MainActivity extends Activity {
     private void loadGroups() {
         savedGroups.clear();
         try {
-            JSONArray data = new JSONArray(getPreferences(MODE_PRIVATE).getString("custom_groups_v12", "[]"));
+            JSONArray data = new JSONArray(store.readGroups());
             for (int i = 0; i < data.length(); i++) {
                 JSONObject item = data.optJSONObject(i);
                 if (item == null) continue;
@@ -1266,7 +1466,7 @@ public class MainActivity extends Activity {
                 items.put(entry);
             } catch (JSONException ignored) { }
         }
-        getPreferences(MODE_PRIVATE).edit().putString("custom_groups_v12", items.toString()).apply();
+        store.saveGroups(items.toString());
     }
 
     private void createGroup() {
@@ -2157,7 +2357,7 @@ public class MainActivity extends Activity {
         if (drawerOverlay != null) return routeDrawerDpad(current, code);
         String tag = focusedTag();
         if (tag != null && tag.startsWith("nav:")) {
-            String[] nav = {"nav:home", "nav:devices", "nav:scenes", "nav:effects",
+            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:effects",
                     "nav:presets", "nav:groups", "nav:settings"};
             int index = 0;
             for (int i = 0; i < nav.length; i++) if (nav[i].equals(tag)) index = i;
