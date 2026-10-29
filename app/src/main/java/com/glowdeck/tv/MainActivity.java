@@ -1257,7 +1257,8 @@ public class MainActivity extends Activity {
         seek.setMax(255);
         seek.setProgress(level);
         seek.setTag(tag);
-        seek.setMinHeight(dp(48));
+        // The layout already provides a 48dp touch target. Do not call
+        // SeekBar.setMinHeight(): this method is absent on older Fire OS.
         seek.setContentDescription(label);
         seek.setProgressTintList(ColorStateList.valueOf(ACCENT));
         seek.setThumbTintList(ColorStateList.valueOf(ACCENT));
