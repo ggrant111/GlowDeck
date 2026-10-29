@@ -81,6 +81,12 @@ public class MainActivity extends Activity {
     private String selectedHost = ""; // "*" targets every configured device.
     private int selectedSegment = -1; // -1 = all segments, per-device segments otherwise.
     private String message = "Ready";
+    private long commandSequence = 0L;
+    private FrameLayout commandBanner;
+    private Runnable dismissCommandBanner;
+    private String bannerText = "";
+    private int bannerColor = ACCENT;
+    private boolean bannerPending = false;
     private boolean running = false;
     private boolean scanning = false;
     private FrameLayout rootFrame;
@@ -169,8 +175,10 @@ public class MainActivity extends Activity {
     }
 
     private void buildCurrentShell() {
+        commandBanner = null;
         if (tvMode) buildShell();
         else buildTouchShell();
+        if (!bannerText.isEmpty()) showBanner(bannerText, bannerColor, bannerPending);
     }
 
     @Override public void onConfigurationChanged(Configuration newConfig) {
@@ -208,6 +216,7 @@ public class MainActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
         network.shutdownNow();
         discoveryWork.shutdownNow();
         super.onDestroy();
@@ -957,23 +966,26 @@ public class MainActivity extends Activity {
 
     private void playScene(GlowScene scene) {
         if (scene.targets.isEmpty()) { toast("This scene contains no lights"); return; }
-        message = "Applying " + scene.name + " to " + scene.targets.size() + " lights…";
-        refreshVisibleState();
+        final long requestId = beginCommandFeedback(scene.name, scene.targets.size());
         List<WledDevice> available = new ArrayList<>(devices);
         network.execute(() -> {
             SceneExecutor.Result result = SceneExecutor.execute(scene, available,
-                    WledApi::snapshot, (host, patch) -> WledApi.send(host, patch));
-            ui.post(() -> {
-                message = scene.name + ": " + result.summary(scene.targets.size());
-                toast(message);
-                if (!result.problems.isEmpty()) new AlertDialog.Builder(this)
-                        .setTitle("Scene applied with issues")
+                    WledApi::snapshot, (host, patch) ->
+                            WledCommandVerifier.sendAndVerify(host, patch,
+                                    WledApi::send, WledApi::snapshot, WledApi::presets,
+                                    sentHost -> commandSent(requestId, scene.name)));
+            completeCommandFeedback(requestId, scene.name, result.succeeded,
+                    scene.targets.size(), result.unconfirmed,
+                    result.failed + result.missing, result.skippedSegments);
+            if (!result.problems.isEmpty()) ui.post(() -> {
+                if (requestId != commandSequence || isFinishing()) return;
+                new AlertDialog.Builder(this)
+                        .setTitle("Scene verification details")
                         .setMessage(result.summary(scene.targets.size()) + "\n\n" +
                                 android.text.TextUtils.join("\n", result.problems))
                         .setPositiveButton("OK", null).show();
-                refreshVisibleState();
-                refreshAll();
             });
+            for (WledDevice d : available) fetchDevice(d);
         });
     }
 
@@ -1123,18 +1135,14 @@ public class MainActivity extends Activity {
         }
         List<WledDevice> target = favoriteTargets(favorite);
         if (target.isEmpty()) { toast("Favorite unavailable: " + targetDescription(favorite.target)); return; }
-        message = "Activating " + favorite.name + "…";
-        refreshVisibleState();
+        final long requestId = beginCommandFeedback(favorite.name, target.size());
         network.execute(() -> {
-            ActionDispatcher.Result result = ActionDispatcher.execute(favorite, target, WledApi::send);
-            ui.post(() -> {
-                String status = result.successful + "/" + target.size() + " lights updated";
-                if (result.unsupported > 0) status += ", " + result.unsupported + " unsupported";
-                if (!result.errors.isEmpty()) status += ", " + result.errors.size() + " offline/failed";
-                message = favorite.name + ": " + status;
-                toast(message);
-                refreshVisibleState();
-            });
+            ActionDispatcher.Result result = ActionDispatcher.execute(favorite, target,
+                    (host, patch) -> WledCommandVerifier.sendAndVerify(host, patch,
+                            WledApi::send, WledApi::snapshot, WledApi::presets,
+                            sentHost -> commandSent(requestId, favorite.name)));
+            completeCommandFeedback(requestId, favorite.name, result.successful, target.size(),
+                    result.unconfirmed, result.errors.size() - result.unconfirmed, result.unsupported);
             for (WledDevice d : target) fetchDevice(d);
         });
     }
@@ -2023,27 +2031,25 @@ public class MainActivity extends Activity {
     private void send(String action, Command command) {
         List<WledDevice> target = targets();
         if (target.isEmpty()) { toast("Add a WLED device first"); return; }
-        message = "Sending " + action + "…";
-        refreshVisibleState();
+        final long requestId = beginCommandFeedback(action, target.size());
         network.execute(() -> {
-            int ok = 0, skipped = 0;
-            String firstError = "";
+            int confirmed = 0, skipped = 0, unconfirmed = 0, failed = 0;
             for (WledDevice d : target) {
                 try {
                     JSONObject patch = command.patch(d);
                     if (patch == null) { skipped++; continue; }
-                    WledApi.send(d.host, patch);
-                    ok++;
-                } catch (Exception ex) { if (firstError.isEmpty()) firstError = concise(ex); }
+                    WledCommandVerifier.sendAndVerify(d.host, patch, WledApi::send,
+                            WledApi::snapshot, WledApi::presets,
+                            sentHost -> commandSent(requestId, d.name()));
+                    confirmed++;
+                } catch (WledCommandVerifier.UnconfirmedException ex) {
+                    unconfirmed++;
+                } catch (Exception ex) {
+                    failed++;
+                }
             }
-            final int sent = ok, skippedCount = skipped;
-            final String error = firstError;
-            ui.post(() -> {
-                message = sent + " of " + target.size() + " updated" +
-                        (skippedCount > 0 ? "  ·  " + skippedCount + " unsupported" : "") +
-                        (!error.isEmpty() ? "  ·  " + error : "");
-                refreshVisibleState();
-            });
+            completeCommandFeedback(requestId, action, confirmed, target.size(),
+                    unconfirmed, failed, skipped);
             for (WledDevice d : target) fetchDevice(d);
         });
     }
@@ -2453,6 +2459,82 @@ public class MainActivity extends Activity {
         }
         multicastLock = null;
         scanning = false;
+    }
+
+    /** Nonblocking in-app notification for Fire TV, tablet and phone. */
+    private void showBanner(String label, int color, boolean pending) {
+        bannerText = label;
+        bannerColor = color;
+        bannerPending = pending;
+        if (rootFrame == null) return;
+        if (commandBanner != null) rootFrame.removeView(commandBanner);
+        FrameLayout panel = new FrameLayout(this);
+        panel.setFocusable(false);
+        panel.setClickable(false);
+        panel.setBackground(shape(0xEE13223A, 12, color, 2));
+        TextView status = text((pending ? "◌  " : "") + label, tvMode ? 12 : 14, WHITE, true);
+        status.setPadding(dp(14), dp(11), dp(14), dp(11));
+        status.setMaxLines(3);
+        status.setFocusable(false);
+        status.setClickable(false);
+        status.setContentDescription(label);
+        panel.addView(status, new FrameLayout.LayoutParams(-2, -2));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.RIGHT);
+        lp.setMargins(dp(12), dp(tvMode ? 66 : 72), dp(14), 0);
+        rootFrame.addView(panel, lp);
+        commandBanner = panel;
+        panel.bringToFront();
+    }
+
+    private long beginCommandFeedback(String action, int count) {
+        long id = ++commandSequence;
+        if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
+        showBanner("Request queued · " + action + " (" + count + " light" + (count == 1 ? "" : "s") + ")",
+                ACCENT, true);
+        return id;
+    }
+
+    private void commandSent(long id, String deviceName) {
+        ui.post(() -> {
+            if (id != commandSequence || isFinishing()) return;
+            showBanner("Request sent to " + deviceName + " · checking WLED state…", ACCENT, true);
+        });
+    }
+
+    private void completeCommandFeedback(long id, String name, int confirmed, int total,
+                                         int unconfirmed, int failed, int unsupported) {
+        ui.post(() -> {
+            if (id != commandSequence || isFinishing()) return;
+            boolean all = total > 0 && confirmed == total && unconfirmed == 0 && failed == 0 && unsupported == 0;
+            String label;
+            int color;
+            if (all) {
+                label = "✓ Confirmed · " + name + " · " + confirmed + "/" + total + " lights";
+                color = GOOD;
+            } else if (confirmed > 0 || unconfirmed > 0) {
+                label = "⚠ " + name + " · " + confirmed + "/" + total + " confirmed";
+                if (unconfirmed > 0) label += " · " + unconfirmed + " not confirmed";
+                if (failed > 0) label += " · " + failed + " failed";
+                if (unsupported > 0) label += " · " + unsupported + " unsupported";
+                color = 0xFFFFC76E;
+            } else {
+                label = "✕ " + name + " · change not confirmed";
+                if (failed > 0) label += " · " + failed + " failed";
+                if (unsupported > 0) label += " · " + unsupported + " unsupported";
+                color = BAD;
+            }
+            message = label;
+            showBanner(label, color, false);
+            if (dismissCommandBanner != null) ui.removeCallbacks(dismissCommandBanner);
+            final long completedId = id;
+            dismissCommandBanner = () -> {
+                if (completedId != commandSequence) return;
+                if (commandBanner != null && rootFrame != null) rootFrame.removeView(commandBanner);
+                commandBanner = null;
+                bannerText = "";
+            };
+            ui.postDelayed(dismissCommandBanner, all ? 4200 : 7500);
+        });
     }
 
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }

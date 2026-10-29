@@ -12,6 +12,7 @@ final class ActionDispatcher {
     static final class Result {
         int successful;
         int unsupported;
+        int unconfirmed;
         final List<String> errors = new ArrayList<>();
     }
     private ActionDispatcher() {}
@@ -24,6 +25,9 @@ final class ActionDispatcher {
                 if (patch == null) { result.unsupported++; continue; }
                 sender.send(d.host, patch);
                 result.successful++;
+            } catch (WledCommandVerifier.UnconfirmedException error) {
+                result.unconfirmed++;
+                result.errors.add(d.name() + ": request sent but not confirmed: " + error.getMessage());
             } catch (Exception error) {
                 result.errors.add(d.name() + ": " + (error.getMessage() == null ? "network error" : error.getMessage()));
             }
