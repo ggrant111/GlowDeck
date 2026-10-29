@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-echo GlowDeck v1.4 - Install on Android phone or tablet
+echo GlowDeck v1.6 - Install on Android phone or tablet
 if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
   set "ADB=%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe"
 ) else (

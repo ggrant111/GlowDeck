@@ -42,7 +42,7 @@ The package ID is unchanged. If updating from an APK signed with a different cer
 
 # GlowDeck Android — GitHub repository
 
-This repository contains the full GlowDeck v1.4.1 Android Studio project for Fire TV, Android tablets, and Android phones. The GitHub Actions workflow at `.github/workflows/build-apk.yml` builds a **debug APK** on pushes to `main` and on manual runs. After a successful run, download `GlowDeck-v1.4-debug-apk` under the **Actions → latest successful run → Artifacts** section. You must be signed into GitHub to download the artifact. Debug builds are for sideloading and testing, not Play Store releases.
+This repository contains the full GlowDeck v1.4.1 Android Studio project for Fire TV, Android tablets, and Android phones. The GitHub Actions workflow at `.github/workflows/build-apk.yml` builds a **debug APK** on pushes to `main` and on manual runs. After a successful run, download `GlowDeck-v1.6-scenes-debug-apk` under the **Actions → latest successful run → Artifacts** section. You must be signed into GitHub to download the artifact. Debug builds are for sideloading and testing, not Play Store releases.
 
 **Note:** GitHub Actions has not been executed or verified; the source has passed previous syntax checks but must still compile on a machine with Android SDK. The workflow invokes Gradle 8.9 directly rather than the project's bundled custom bootstrap wrapper.
 
@@ -52,7 +52,7 @@ This repository contains the full GlowDeck v1.4.1 Android Studio project for Fir
 
 Native Java Android Studio project; supports WLED's local JSON API without a WebView or cloud account. Application ID remains `com.glowdeck.tv` so existing Fire TV users can upgrade (when signed with the same signing key).
 
-## What's new (v1.4)
+## What's new (v1.6)
 
 One APK chooses its interface according to device type and available screen width:
 
@@ -64,6 +64,10 @@ One APK chooses its interface according to device type and available screen widt
 | Android phone / compact window (<600dp) | Portrait-friendly stacked cards, bottom icon navigation, bottom sheet-like drawers |
 
 Rotation and split-screen resizing are supported, without losing saved devices/groups. Phone/tablet status and system navigation bars remain available; Fire TV remains immersive. Most interactive touch controls target at least 48dp. Quick colors, effects, actual WLED presets, groups, device scanning, power, brightness, segment support, and palettes are carried over.
+
+**Scenes (v1.6):** Open Scenes on Fire TV/tablet/phone, select **Capture new scene**, name the scene and check the WLED controllers to include. GlowDeck reads each controller's actual `/json` state; if any selected device cannot be captured, the scene is not saved and you can retry. Use Edit to change the per-light look (power, brightness, color, effect) *without changing live lights*, change membership, capture again, rename, duplicate, adjust transition, or add to Favorites. Press Play to apply different saved looks to each controller. Scene execution reports offline/unsupported controllers and avoids syncing those different looks between WLED devices with one-shot UDP suppression. Scenes persist locally in GlowDeck, not WLED preset slots.
+
+**Known limitation:** Scenes are captured snapshots; saving or editing a GlowDeck scene does not save a WLED preset. Physical 3D/2D segment layout and bounds are never changed by a scene. Scene execution requires local LAN access and may show partial failure when effects or segments are no longer supported. Future v1.7 sync will share scenes across installations.
 
 **Slider behavior:** drag the native Brightness, Speed, or Intensity slider. The percentage moves while dragging; a single command is sent when you release, avoiding a flood of network requests. Live polling updates the values without resetting the user's drag position. Fire TV retains the existing remote-specific adjustment mode.
 
@@ -115,3 +119,12 @@ Java source parsed successfully and ZIP/XML structure checked. This environment 
 
 ## App branding in v1.4.1
 The new cyan-to-blue G/home/Wi-Fi brand mark is included as the Android launcher icon (`mipmap-*`), the adaptive/round launcher icon (`mipmap-anydpi-v26`), and the 320x180 Fire TV launcher banner (`drawable-nodpi/tv_banner.png`). Full transparent logo assets are kept in `drawable-nodpi/glowdeck_brand_full.png` and `glowdeck_brand_mark.png`. Existing screens, saved devices, package ID and WLED functionality are unchanged. Version code is incremented to 6.
+
+## v1.6 manual acceptance checklist
+
+- Create Movie Night by capturing at least two reachable WLED lights with distinct looks; activate and confirm each receives only its own saved look.
+- Edit one light brightness, color and effect; confirm the live lights do not change until Play.
+- Edit membership without recapturing existing lights, duplicate and rename, and verify persistence across app restart.
+- Confirm one disconnected device does not prevent other lights from activating, and errors name the skipped/failed controller.
+- Save scene as Favorite and verify one-click activation on Fire TV with D-pad and on Android touchscreen.
+- Check phone portrait, tablet landscape, and 16:9 TV drawer focus; install upgrade over v1.5 using the same signing certificate.

@@ -117,6 +117,7 @@ public class MainActivity extends Activity {
     private ScrollView touchScroll;
     private final List<SavedGroup> savedGroups = new ArrayList<>();
     private final List<Favorite> favorites = new ArrayList<>();
+    private final List<GlowScene> scenes = new ArrayList<>();
     private GlowDeckRepository store;
     private float uiScale = 1f; // Keep the entire dashboard inside the TV viewport.
     private NsdManager nsd;
@@ -135,6 +136,7 @@ public class MainActivity extends Activity {
         chooseDisplayMode();
         store = new GlowDeckRepository(this, getPreferences(MODE_PRIVATE));
         favorites.addAll(store.loadFavorites());
+        scenes.addAll(store.loadScenes());
         loadDevices();
         loadGroups();
         buildCurrentShell();
@@ -311,7 +313,7 @@ public class MainActivity extends Activity {
         navList.removeAllViews();
         String[][] entries = {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
-                {"effects", "Effects"}, {"presets", "Presets"}, {"groups", "Groups"},
+                {"scenes", "Scenes"}, {"effects", "Effects"}, {"presets", "Presets"},
                 {"settings", "Settings"}
         };
         for (String[] entry : entries) {
@@ -512,11 +514,11 @@ public class MainActivity extends Activity {
         navList.removeAllViews();
         String[][] items = touchNavAtBottom ? new String[][] {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Faves"},
-                {"presets", "Presets"}, {"settings", "More"}
+                {"scenes", "Scenes"}, {"settings", "More"}
         } : new String[][] {
                 {"home", "Home"}, {"devices", "Lights"}, {"favorites", "Favorites"},
-                {"effects", "Effects"}, {"presets", "Presets"},
-                {"groups", "Groups"}, {"settings", "More"}
+                {"scenes", "Scenes"}, {"effects", "Effects"},
+                {"presets", "Presets"}, {"groups", "Groups"}, {"settings", "More"}
         };
         for (String[] entry : items) {
             boolean active = activeDrawer.equals(entry[0]) ||
@@ -597,6 +599,8 @@ public class MainActivity extends Activity {
         }
         addTouchFavorites(controlList);
         controlList.addView(space(1, 12));
+        addTouchScenes(controlList);
+        controlList.addView(space(1, 12));
         if (twoColumns) {
             LinearLayout columns = horizontal(Gravity.TOP);
             LinearLayout left = vertical(), right = vertical();
@@ -654,7 +658,330 @@ public class MainActivity extends Activity {
         parent.addView(card, sized(-1, -2));
     }
 
+    // -------- GlowDeck multi-device scene builder (v1.6) --------
+
+    private GlowScene sceneById(String id) {
+        for (GlowScene scene : scenes) if (scene.id.equals(id)) return scene;
+        return null;
+    }
+
+    private void addTouchScenes(LinearLayout parent) {
+        LinearLayout card = touchCard("▦  SCENES", "Manage  ›", () -> openDrawer("scenes"));
+        if (scenes.isEmpty()) {
+            card.addView(text("Capture different looks across lights, then activate them together.", 13, MUTED, false));
+            card.addView(space(1, 9));
+            card.addView(button("+ Create a scene", "scene:add:home", this::createSceneDialog, true), sized(-1, 49));
+        } else {
+            int columns = touchNavAtBottom ? 2 : 3;
+            for (int i = 0; i < Math.min(6, scenes.size()); i += columns) {
+                LinearLayout row = horizontal(Gravity.CENTER_VERTICAL);
+                for (int j = 0; j < columns && i + j < Math.min(6, scenes.size()); j++) {
+                    GlowScene scene = scenes.get(i + j);
+                    TextView button = button("▦ " + scene.name, "glowscene:" + scene.id,
+                            () -> playScene(scene), false);
+                    button.setContentDescription("Activate " + scene.name + " across " + scene.targets.size() + " lights");
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(52), 1);
+                    if (j > 0) lp.leftMargin = dp(7);
+                    row.addView(button, lp);
+                }
+                card.addView(row);
+                if (i + columns < Math.min(6, scenes.size())) card.addView(space(1, 8));
+            }
+        }
+        parent.addView(card, sized(-1, -2));
+    }
+
+    private void renderScenesDrawer(LinearLayout list, LinearLayout sheet) {
+        drawerInfo(list, "Each scene stores a different look for every selected WLED controller. Editing never changes the live lights.");
+        if (scenes.isEmpty()) drawerInfo(list, "No scenes saved. Arrange your WLED lights, then capture their current looks.");
+        for (int i = 0; i < scenes.size(); i++) {
+            GlowScene scene = scenes.get(i);
+            list.addView(drawerItem("▶  " + scene.name,
+                    scene.targets.size() + " lights  ·  " + scene.transitionMs + " ms transition",
+                    i == 0 ? "drawer:first" : "glowscene:" + scene.id,
+                    () -> { dismissAllDrawers(); playScene(scene); }, false), lpBottom(5));
+            list.addView(button("Edit / favorite  ·  " + scene.name,
+                    "glowscene:edit:" + scene.id, () -> editSceneDialog(scene), false), lpBottom(12));
+        }
+        sheet.addView(space(1, 8));
+        sheet.addView(button("+ Capture new scene", "glowscene:add", this::createSceneDialog, true),
+                sized(-1, tvMode ? 43 : 49));
+    }
+
+    private void createSceneDialog() {
+        if (devices.isEmpty()) { toast("Add WLED lights before creating a scene"); return; }
+        if (scenes.size() >= 50) { toast("Maximum 50 scenes. Delete one to create another."); return; }
+        askText("New scene name", "e.g. Movie Night", "Movie Night", name -> {
+            String label = name.trim();
+            if (label.isEmpty()) { toast("Scene name is required"); return; }
+            GlowScene scene = GlowScene.create(label.length() > 48 ? label.substring(0, 48) : label, 700);
+            selectSceneMembers(scene, true);
+        });
+    }
+
+    private void selectSceneMembers(GlowScene scene, boolean creating) {
+        if (devices.isEmpty()) { toast("No WLED lights configured"); return; }
+        String[] labels = new String[devices.size()];
+        boolean[] checked = new boolean[devices.size()];
+        for (int i = 0; i < devices.size(); i++) {
+            WledDevice d = devices.get(i);
+            labels[i] = d.name() + "  ·  " + (d.online ? "Connected" : "Offline") + "  ·  " + d.host;
+            // New scene defaults to all lights, or the currently selected group.
+            boolean selected = creating && ("*".equals(selectedHost) ||
+                    targets().contains(d));
+            if (!creating) for (GlowScene.Target item : scene.targets)
+                if (item.deviceId.equals(d.identity()) || item.lastHost.equals(d.host)) selected = true;
+            checked[i] = selected;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(creating ? "Choose lights to capture" : "Choose lights in " + scene.name)
+                .setMultiChoiceItems(labels, checked, (dialog, index, enabled) -> checked[index] = enabled)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton(creating ? "Capture looks" : "Save selection", (dialog, button) -> {
+                    List<WledDevice> selected = new ArrayList<>();
+                    for (int i = 0; i < checked.length; i++) if (checked[i]) selected.add(devices.get(i));
+                    if (selected.isEmpty()) { toast("Select at least one light"); return; }
+                    if (creating) captureNewScene(scene, selected);
+                    else updateSceneMembers(scene, selected);
+                }).show();
+    }
+
+    /** Capture actual /json state rather than the simplified dashboard model. */
+    private void captureNewScene(GlowScene scene, List<WledDevice> selected) {
+        message = "Capturing " + selected.size() + " WLED looks…";
+        refreshVisibleState();
+        network.execute(() -> {
+            List<GlowScene.Target> captured = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            for (WledDevice d : selected) {
+                try { captured.add(GlowScene.Target.capture(d, WledApi.snapshot(d.host))); }
+                catch (Exception e) { errors.add(d.name() + ": " + concise(e)); }
+            }
+            ui.post(() -> {
+                if (!errors.isEmpty() || captured.isEmpty()) {
+                    new AlertDialog.Builder(this).setTitle("Scene not saved")
+                            .setMessage("Every selected light must be captured successfully. " +
+                                    "No scene has been saved or lights changed.\n\n" +
+                                    android.text.TextUtils.join("\n", errors))
+                            .setPositiveButton("Retry", (x, y) -> captureNewScene(scene, selected))
+                            .setNegativeButton("Cancel", null).show();
+                    return;
+                }
+                scene.targets.addAll(captured);
+                scenes.add(scene);
+                saveAndShowScenes();
+                toast("Saved scene: " + scene.name + " (" + scene.targets.size() + " lights)");
+            });
+        });
+    }
+
+    /** Membership editing keeps existing saved looks; captures only newly included lights. */
+    private void updateSceneMembers(GlowScene scene, List<WledDevice> selected) {
+        network.execute(() -> {
+            List<GlowScene.Target> newTargets = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            for (WledDevice d : selected) {
+                GlowScene.Target old = null;
+                for (GlowScene.Target target : scene.targets)
+                    if (target.deviceId.equals(d.identity()) || target.lastHost.equals(d.host)) { old = target; break; }
+                if (old != null) newTargets.add(old);
+                else try { newTargets.add(GlowScene.Target.capture(d, WledApi.snapshot(d.host))); }
+                catch (Exception e) { errors.add(d.name() + ": " + concise(e)); }
+            }
+            ui.post(() -> {
+                if (!errors.isEmpty()) {
+                    new AlertDialog.Builder(this).setTitle("Selection not changed")
+                            .setMessage("Newly added lights could not be captured. Existing scene is unchanged.\n\n" +
+                                    android.text.TextUtils.join("\n", errors))
+                            .setPositiveButton("OK", null).show();
+                    return;
+                }
+                scene.targets.clear();
+                scene.targets.addAll(newTargets);
+                saveAndShowScenes();
+                toast("Scene updated. No live lights changed.");
+            });
+        });
+    }
+
+    private void editSceneDialog(GlowScene scene) {
+        new AlertDialog.Builder(this).setTitle(scene.name)
+                .setItems(new String[]{"▶ Play scene", "Edit individual lights", "Change included lights",
+                        "Rename", "Transition speed", "★ Add to Favorites", "Duplicate", "Delete scene"},
+                        (dialog, which) -> {
+                            if (which == 0) { dismissAllDrawers(); playScene(scene); }
+                            else if (which == 1) editSceneLights(scene);
+                            else if (which == 2) selectSceneMembers(scene, false);
+                            else if (which == 3) askText("Rename scene", "Scene name", scene.name, name -> {
+                                String value = name.trim();
+                                if (!value.isEmpty()) { scene.name = value.length() > 48 ? value.substring(0, 48) : value;
+                                    saveAndShowScenes(); }
+                            });
+                            else if (which == 4) editSceneTransition(scene);
+                            else if (which == 5) favoriteScene(scene);
+                            else if (which == 6) {
+                                if (scenes.size() >= 50) { toast("Maximum 50 scenes"); return; }
+                                try {
+                                    GlowScene duplicate = GlowScene.create(scene.name + " Copy", scene.transitionMs);
+                                    for (GlowScene.Target t : scene.targets)
+                                        duplicate.targets.add(GlowScene.Target.fromJson(t.toJson()));
+                                    scenes.add(duplicate);
+                                    saveAndShowScenes();
+                                } catch (JSONException e) { toast("Could not duplicate scene"); }
+                            } else if (which == 7) new AlertDialog.Builder(this)
+                                    .setTitle("Delete " + scene.name + "?")
+                                    .setMessage("This only deletes the saved scene. WLED lights and presets won't change. " +
+                                            "Related favorites will become unavailable until removed.")
+                                    .setPositiveButton("Delete", (d, w) -> {
+                                        scenes.remove(scene); saveAndShowScenes();
+                                    }).setNegativeButton("Cancel", null).show();
+                        }).setNegativeButton("Close", null).show();
+    }
+
+    private void editSceneLights(GlowScene scene) {
+        String[] labels = new String[scene.targets.size()];
+        for (int i = 0; i < labels.length; i++) {
+            GlowScene.Target t = scene.targets.get(i);
+            labels[i] = t.name + " · " + (t.state.optBoolean("on") ? "On" : "Off") +
+                    " · " + Math.round(t.state.optInt("bri", 128) * 100f / 255f) + "%";
+        }
+        new AlertDialog.Builder(this).setTitle("Edit light looks · " + scene.name)
+                .setItems(labels, (dialog, index) -> editSceneLight(scene, index))
+                .setNegativeButton("Close", null).show();
+    }
+
+    private void editSceneLight(GlowScene scene, int index) {
+        if (index < 0 || index >= scene.targets.size()) return;
+        GlowScene.Target t = scene.targets.get(index);
+        new AlertDialog.Builder(this).setTitle(t.name + " · " + scene.name)
+                .setItems(new String[]{"Turn on", "Turn off", "Brightness", "Quick color", "Effect",
+                        "Capture live look again", "Remove this light"}, (dialog, which) -> {
+                    try {
+                        if (which == 0 || which == 1) replaceSceneTarget(scene, index, t.withPower(which == 0));
+                        if (which == 2) {
+                            String[] labels = {"10%", "25%", "40%", "60%", "75%", "100%"};
+                            int[] values = {10, 25, 40, 60, 75, 100};
+                            new AlertDialog.Builder(this).setTitle(t.name + " brightness")
+                                    .setItems(labels, (d, i) -> {
+                                        try { replaceSceneTarget(scene, index,
+                                                t.withBrightness(Math.round(values[i] * 255f / 100f))); }
+                                        catch (JSONException e) { toast("Could not update scene"); }
+                                    }).setNegativeButton("Cancel", null).show();
+                        }
+                        if (which == 3) new AlertDialog.Builder(this)
+                                .setTitle(t.name + " color")
+                                .setItems(COLOR_NAMES, (d, i) -> {
+                                    try { replaceSceneTarget(scene, index,
+                                            t.withColor(COLOR_VALUES[i] & 0xFFFFFF)); }
+                                    catch (JSONException e) { toast("Could not update scene"); }
+                                }).setNegativeButton("Cancel", null).show();
+                        if (which == 4) {
+                            WledDevice device = SceneExecutor.findDevice(t, devices);
+                            if (device == null || device.effects.isEmpty()) {
+                                toast("Connect this WLED light to load its effects first"); return;
+                            }
+                            List<String> options = new ArrayList<>();
+                            for (String effect : device.effects)
+                                if (validOption(effect)) options.add(effect);
+                            new AlertDialog.Builder(this).setTitle(t.name + " effect")
+                                    .setItems(options.toArray(new String[0]), (d, i) -> {
+                                        try { replaceSceneTarget(scene, index, t.withEffect(options.get(i))); }
+                                        catch (JSONException e) { toast("Could not update scene"); }
+                                    }).setNegativeButton("Cancel", null).show();
+                        }
+                        if (which == 5) recaptureSceneLight(scene, index);
+                        if (which == 6) {
+                            if (scene.targets.size() == 1) {
+                                toast("A scene needs at least one light. Delete the scene instead."); return;
+                            }
+                            new AlertDialog.Builder(this).setTitle("Remove " + t.name + " from scene?")
+                                    .setMessage("Only the saved scene is modified; the actual light won't change.")
+                                    .setPositiveButton("Remove", (d, w) -> {
+                                        scene.targets.remove(index); saveAndShowScenes();
+                                    }).setNegativeButton("Cancel", null).show();
+                        }
+                    } catch (JSONException e) { toast("Could not update scene"); }
+                }).setNegativeButton("Close", null).show();
+    }
+
+    private void replaceSceneTarget(GlowScene scene, int index, GlowScene.Target target) {
+        if (!scenes.contains(scene) || index < 0 || index >= scene.targets.size()) return;
+        scene.targets.set(index, target);
+        saveAndShowScenes();
+        toast("Saved " + target.name + " · No live changes");
+    }
+
+    private void recaptureSceneLight(GlowScene scene, int index) {
+        GlowScene.Target target = scene.targets.get(index);
+        WledDevice device = SceneExecutor.findDevice(target, devices);
+        if (device == null) { toast("WLED device is missing. Rescan lights first."); return; }
+        network.execute(() -> {
+            try {
+                GlowScene.Target updated = GlowScene.Target.capture(device, WledApi.snapshot(device.host));
+                ui.post(() -> replaceSceneTarget(scene, index, updated));
+            } catch (Exception e) { ui.post(() -> toast("Capture failed: " + concise(e))); }
+        });
+    }
+
+    private void editSceneTransition(GlowScene scene) {
+        int[] times = {0, 300, 700, 1500, 3000, 5000};
+        String[] titles = {"Instant", "0.3 seconds", "0.7 seconds", "1.5 seconds", "3 seconds", "5 seconds"};
+        new AlertDialog.Builder(this).setTitle("Transition · " + scene.name)
+                .setItems(titles, (dialog, which) -> { scene.transitionMs = times[which];
+                    saveAndShowScenes(); }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void chooseSceneToFavorite() {
+        if (scenes.isEmpty()) { toast("Create a GlowDeck scene first"); return; }
+        String[] names = new String[scenes.size()];
+        for (int i = 0; i < names.length; i++) names[i] = scenes.get(i).name;
+        new AlertDialog.Builder(this).setTitle("Favorite GlowDeck scene")
+                .setItems(names, (dialog, which) -> favoriteScene(scenes.get(which)))
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void favoriteScene(GlowScene scene) {
+        if (favorites.size() >= 50) { toast("Maximum 50 favorites"); return; }
+        for (Favorite f : favorites) if (Favorite.SCENE.equals(f.action) &&
+                f.target.equals("scene:" + scene.id)) { toast("Scene already in Favorites"); return; }
+        favorites.add(Favorite.createScene(scene.name, scene.id));
+        saveAndShowFavorites();
+        toast("Added ★ " + scene.name);
+    }
+
+    private void saveAndShowScenes() {
+        store.saveScenes(scenes);
+        render();
+        if (drawerOverlay != null && "scenes".equals(activeDrawer)) showDrawer();
+    }
+
+    private void playScene(GlowScene scene) {
+        if (scene.targets.isEmpty()) { toast("This scene contains no lights"); return; }
+        message = "Applying " + scene.name + " to " + scene.targets.size() + " lights…";
+        refreshVisibleState();
+        List<WledDevice> available = new ArrayList<>(devices);
+        network.execute(() -> {
+            SceneExecutor.Result result = SceneExecutor.execute(scene, available,
+                    WledApi::snapshot, (host, patch) -> WledApi.send(host, patch));
+            ui.post(() -> {
+                message = scene.name + ": " + result.summary(scene.targets.size());
+                toast(message);
+                if (!result.problems.isEmpty()) new AlertDialog.Builder(this)
+                        .setTitle("Scene applied with issues")
+                        .setMessage(result.summary(scene.targets.size()) + "\n\n" +
+                                android.text.TextUtils.join("\n", result.problems))
+                        .setPositiveButton("OK", null).show();
+                refreshVisibleState();
+                refreshAll();
+            });
+        });
+    }
+
     private String targetDescription(String target) {
+        if (target.startsWith("scene:")) {
+            GlowScene scene = sceneById(target.substring(6));
+            return scene == null ? "missing scene" : scene.name;
+        }
         if ("*".equals(target)) return "all lights";
         if (target.startsWith("@g:")) for (SavedGroup group : savedGroups) {
             if (target.equals("@g:" + group.id)) return group.name;
@@ -684,7 +1011,7 @@ public class MainActivity extends Activity {
         final WledDevice d = currentDevice();
         final String targetLabel = selectedName();
         new AlertDialog.Builder(this).setTitle("Add favorite for " + targetLabel)
-                .setItems(new String[]{"Power ON", "Power OFF", "Set brightness", "Set quick color", "WLED preset"},
+                .setItems(new String[]{"Power ON", "Power OFF", "Set brightness", "Set quick color", "WLED preset", "GlowDeck scene"},
                         (dialog, choice) -> {
                             if (choice == 0) nameAndSaveFavorite(target, Favorite.POWER, 1, "", -1, targetLabel + " On");
                             else if (choice == 1) nameAndSaveFavorite(target, Favorite.POWER, 0, "", -1, targetLabel + " Off");
@@ -702,6 +1029,8 @@ public class MainActivity extends Activity {
                                                 Favorite.COLOR, COLOR_VALUES[idx] & 0xFFFFFF, "", -1,
                                                 targetLabel + " " + COLOR_NAMES[idx]))
                                         .setNegativeButton("Cancel", null).show();
+                            } else if (choice == 5) {
+                                chooseSceneToFavorite();
                             } else {
                                 if (d == null || d.presets.isEmpty()) {
                                     if (d != null) requestPresets(d);
@@ -786,6 +1115,12 @@ public class MainActivity extends Activity {
     }
 
     private void runFavorite(Favorite favorite) {
+        if (Favorite.SCENE.equals(favorite.action)) {
+            GlowScene scene = sceneById(favorite.target.substring(6));
+            if (scene != null) playScene(scene);
+            else toast("Scene shortcut unavailable. Open Favorites to remove it.");
+            return;
+        }
         List<WledDevice> target = favoriteTargets(favorite);
         if (target.isEmpty()) { toast("Favorite unavailable: " + targetDescription(favorite.target)); return; }
         message = "Activating " + favorite.name + "…";
@@ -1267,7 +1602,8 @@ public class MainActivity extends Activity {
         if (activeDrawer.equals("devices")) renderDevicesDrawer(list, sheet);
         else if (activeDrawer.equals("effects")) renderEffectsDrawer(list);
         else if (activeDrawer.equals("favorites")) renderFavoritesDrawer(list, sheet);
-        else if (activeDrawer.equals("presets") || activeDrawer.equals("scenes")) renderPresetsDrawer(list, sheet);
+        else if (activeDrawer.equals("presets")) renderPresetsDrawer(list, sheet);
+        else if (activeDrawer.equals("scenes")) renderScenesDrawer(list, sheet);
         else if (activeDrawer.equals("groups")) renderGroupsDrawer(list, sheet);
         else if (activeDrawer.equals("palettes")) renderPalettesDrawer(list);
         else if (activeDrawer.equals("settings")) renderSettingsDrawer(list);
@@ -1289,7 +1625,7 @@ public class MainActivity extends Activity {
             case "favorites": return "Favorites";
             case "effects": return "Effects";
             case "presets": return "Presets";
-            case "scenes": return "Scenes · WLED presets";
+            case "scenes": return "GlowDeck Scenes";
             case "groups": return "Groups";
             case "palettes": return "Palettes";
             case "settings": return "More options";
@@ -1407,9 +1743,11 @@ public class MainActivity extends Activity {
 
     private void renderSettingsDrawer(LinearLayout list) {
         drawerInfo(list, "Advanced WLED options and app configuration.");
+        list.addView(drawerItem("▦  Scenes", "Capture and coordinate several lights",
+                "settings:scenes", () -> openDrawer("scenes"), false), lpBottom(7));
         list.addView(drawerItem("★  Favorites", "Pin and manage one-tap lighting actions",
                 "settings:favorites", () -> openDrawer("favorites"), false), lpBottom(7));
-        if (!tvMode) list.addView(drawerItem("◎  Groups", "Create and select collections of controllers", "settings:groups",
+        list.addView(drawerItem("◎  Groups", "Create and select collections of controllers", "settings:groups",
                 () -> openDrawer("groups"), false), lpBottom(7));
         list.addView(drawerItem("◉  Change device", selectedName(), "drawer:first",
                 () -> openDrawer("devices"), false), lpBottom(7));
@@ -2357,8 +2695,8 @@ public class MainActivity extends Activity {
         if (drawerOverlay != null) return routeDrawerDpad(current, code);
         String tag = focusedTag();
         if (tag != null && tag.startsWith("nav:")) {
-            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:effects",
-                    "nav:presets", "nav:groups", "nav:settings"};
+            String[] nav = {"nav:home", "nav:devices", "nav:favorites", "nav:scenes",
+                    "nav:effects", "nav:presets", "nav:settings"};
             int index = 0;
             for (int i = 0; i < nav.length; i++) if (nav[i].equals(tag)) index = i;
             if (code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN) {

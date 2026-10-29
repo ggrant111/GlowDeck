@@ -14,7 +14,7 @@ For the command-line method, create the repository **without** an initial README
 git init
 git branch -M main
 git add .
-git commit -m "Initial GlowDeck v1.4 universal Android app"
+git commit -m "Initial GlowDeck v1.6 universal Android app"
 git remote add origin https://github.com/ggrant111/glowdeck-android.git
 git push -u origin main
 ```

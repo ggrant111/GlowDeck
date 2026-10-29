@@ -10,6 +10,7 @@ final class Favorite {
     static final String BRIGHTNESS = "brightness";
     static final String COLOR = "color";
     static final String PRESET = "preset";
+    static final String SCENE = "scene";
 
     final String id;
     final String name;
@@ -34,6 +35,10 @@ final class Favorite {
                            String presetName, int presetId) {
         return new Favorite(UUID.randomUUID().toString(), name, target, action,
                 value, presetName, presetId);
+    }
+
+    static Favorite createScene(String name, String sceneId) {
+        return new Favorite(UUID.randomUUID().toString(), name, "scene:" + sceneId, SCENE, 0, "", -1);
     }
 
     Favorite renamed(String newName) {
@@ -69,6 +74,9 @@ final class Favorite {
             case PRESET:
                 if (presetName.isEmpty() && (presetId < 1 || presetId > 250)) return null;
                 break;
+            case SCENE:
+                if (!target.startsWith("scene:") || target.length() < 8) return null;
+                break;
             default: return null;
         }
         return new Favorite(id, name, target, action, value, presetName, presetId);
@@ -80,6 +88,7 @@ final class Favorite {
             case BRIGHTNESS: return "Brightness " + Math.round(value * 100f / 255) + "%";
             case COLOR: return String.format(java.util.Locale.US, "Color #%06X", value);
             case PRESET: return "Preset " + (presetName.isEmpty() ? presetId : presetName);
+            case SCENE: return "GlowDeck multi-device scene";
             default: return "Lighting action";
         }
     }

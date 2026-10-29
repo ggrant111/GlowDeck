@@ -10,6 +10,8 @@ final class WledDevice {
     String alias;
     String reportedName = "";
     String version = "";
+    String deviceId = "";
+    String mac = "";
     boolean online = false;
     boolean on = false;
     int brightness = 128;
@@ -31,6 +33,12 @@ final class WledDevice {
 
     WledDevice(String host, String alias) { this.host = host; this.alias = alias; }
 
+    String identity() {
+        if (!deviceId.isEmpty()) return "wled:" + deviceId.toLowerCase(java.util.Locale.US);
+        if (!mac.isEmpty()) return "mac:" + mac.toLowerCase(java.util.Locale.US);
+        return "host:" + host.toLowerCase(java.util.Locale.US);
+    }
+
     String name() {
         return alias != null && !alias.trim().isEmpty() ? alias :
                reportedName.isEmpty() ? host : reportedName;
@@ -45,6 +53,8 @@ final class WledDevice {
         lastStateSignature = state.toString();
         reportedName = info.optString("name", reportedName);
         version = info.optString("ver", version);
+        deviceId = info.optString("deviceId", deviceId);
+        mac = info.optString("mac", mac);
         ledCount = info.optJSONObject("leds") == null ? 0 : info.optJSONObject("leds").optInt("count", 0);
         on = state.optBoolean("on", false);
         brightness = state.optInt("bri", brightness);
