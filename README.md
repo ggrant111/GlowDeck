@@ -1,26 +1,41 @@
-# GlowDeck v1.6.2 — Command Status & WLED State Verification
+# GlowDeck v1.6.3 — Effect-aware color slots
 
-**New:** A persistent, nonblocking in-app status banner shows **Request queued → Request sent, checking WLED state → Confirmed / Not confirmed / Failed** when GlowDeck changes a light.
+**Version 1.6.3 (versionCode 11).** Fixes the WLED effect-color workflow: choosing any color no longer switches your chosen effect to Solid. Select separate Fx (primary), Bg (background), or Cs (tertiary) pickers where the WLED effect supports them, then adjust using quick colors or a custom RGB picker. You can change each slot independently while keeping its other colors and RGBW white values.
 
-Every command in the main WLED control panel, Favorites, WLED preset save, and multi-device scenes now independently checks each controller with `GET /json` after a successful `POST /json/state`; preset creation is verified via `GET /presets.json`. A successful HTTP POST is **not** enough to claim the change occurred. The app does not resend a command while verifying it. After four read attempts, an unmatched state is **not confirmed**, not falsely marked as successful or failed. Group and scene results distinguish confirmed/failed/unconfirmed/unsupported controllers.
+**WLED integration:** Reads metadata from `GET /json/fxdata` for WLED 0.14+ and parses the second semicolon-separated section to determine active color slots. Older WLED devices use legacy three-color controls. Color updates send only `on` and `seg[].col` to `POST /json/state` (no `fx` or palette changes). A palette-driven effect may not visibly respond to manual color slots even though the WLED controller confirms the stored setting; change palette if needed.
 
-The notification does not steal Fire TV D-pad focus. It works on Fire TV, Android tablets, and phones, automatically disappearing after a successful confirmation (approximately 4 seconds) or after an unsuccessful verification (approximately 8 seconds).
+**Favorites:** Existing quick-color Favorites now modify primary Fx color while retaining the current effect.
 
-**Limits:** The API verifies the state **reported by WLED**, not the physical light output. Long fade transitions or changes made simultaneously by another client can still return **not confirmed**. This is a local-network feature and uses no cloud service or new account.
+**Scene editing:** Color edits to saved scenes now preserve effects; no live lighting changes until Play. Full-color RGB edit and quick swatches work with separate slots.
 
-v1.6.1's older Fire OS SeekBar startup compatibility fix remains included. Configurations and saved devices, Favorites, groups, and scenes are preserved during an in-place install with the same signing key.
+**Feedback:** v1.6.2 command sent/confirmed banners remain in effect; all requests are verified against the controller's reported state.
 
-To build, use JDK 17 / SDK 35 and run `gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug`. Inspect the Actions run on GitHub to download the debug APK. Run the device checks in `docs/V1_6_2_COMMAND_FEEDBACK_TESTS.md`.
+**Testing:** See `docs/V1_6_3_COLOR_TESTS.md`. Automatic CI builds/unit tests don't replace Fire OS hardware testing.
+
+---
+
+# GlowDeck v1.6.2 — Verified Command Feedback
+
+One Android APK supports Fire TV, tablets and phones (`com.glowdeck.tv`, versionCode 10).
+
+## Status notifications
+Whenever GlowDeck changes WLED state via a control, Favorite, WLED preset, or saved multi-device scene, a nonblocking banner appears instantly. It shows **Request queued**, then **Request sent · checking WLED state**, then **Confirmed**, **Not confirmed**, or **Failed**. For groups, GlowDeck reports how many controllers were confirmed. This confirmation is based on independent `GET /json` reads after `POST /json/state`, not the HTTP send result. Saved preset creation is checked by reading `/presets.json`.
+
+A timeout does not mean the command failed: if the reported WLED state has not caught up after the verification window, GlowDeck reports **not confirmed** rather than making a false success claim. Physical light output (e.g. visually observed color) cannot be certified by the WLED API; confirmation means the controller *reports* the requested state.
+
+No changes to saved devices, groups, scenes, favorites, or WLED network settings; v1.6.1's Fire Tablet startup fix remains included.
+
+Build: `gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug` (JDK 17, Android SDK 35). See the GitHub Actions build artifact.
 
 ---
 
 # GlowDeck v1.6.1 — Fire Tablet compatibility hotfix
 
-Version 1.6.1 (versionCode 9). Fixes a crash on older Fire OS devices caused by a call to unavailable `SeekBar.setMinHeight(int)` in `MainActivity.touchSeek`. Brightness, Speed, and Intensity sliders retain 48dp height from their existing layout parameters.
+Version 1.6.1 (versionCode 9). This release resolves a crash that affected some older Amazon Fire tablets when creating the brightness slider. `MainActivity.touchSeek` no longer calls the unavailable `SeekBar.setMinHeight(int)` method; the slider still receives a 48dp height through its layout parameters.
 
-**Upgrade:** Keep the same application package (`com.glowdeck.tv`) and install over the old app using the same signing certificate to preserve saved WLED controllers, groups, Favorites, and scenes. Do not uninstall simply to resolve this crash. APKs with different debug signing certificates may be incompatible.
+**Upgrade:** Install over the existing GlowDeck app using the same signing certificate to retain devices, groups, favorites, and scenes. Don't uninstall just to fix the crash. If Android reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, the signing certificate is different; preserve or back up your configuration before choosing to uninstall.
 
-**Test:** See [Fire Tablet compatibility instructions](docs/FIRE_TABLET_COMPATIBILITY.md). Build/unit test success is not a substitute for physical Fire OS testing.
+**Test on Fire Tablet:** `adb logcat -c`, install and launch, then `adb logcat -d -b crash -v time`. See [Fire Tablet compatibility test](docs/FIRE_TABLET_COMPATIBILITY.md). GitHub Actions compiles and runs JVM tests but physical Fire OS confirmation is still required.
 
 ---
 

@@ -25,6 +25,11 @@ final class WledApi {
         return new JSONObject(get(host, "/presets.json"));
     }
 
+    /** Available on WLED 0.14+; failure must not prevent older device operation. */
+    static org.json.JSONArray effectMetadata(String host) throws Exception {
+        return new org.json.JSONArray(get(host, "/json/fxdata"));
+    }
+
     static JSONObject nodes(String host) throws Exception {
         return new JSONObject(get(host, "/json/nodes"));
     }

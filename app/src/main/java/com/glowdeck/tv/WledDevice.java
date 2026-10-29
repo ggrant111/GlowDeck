@@ -21,6 +21,9 @@ final class WledDevice {
     int intensity = 128;
     int currentPreset = -1;
     int rgb = 0xFFFFA75F;
+    final List<String> effectMetadata = new ArrayList<>();
+    boolean loadedEffectMetadata = false;
+    boolean loadingEffectMetadata = false;
     int ledCount = 0;
     final List<Segment> segments = new ArrayList<>();
     final List<String> effects = new ArrayList<>();
@@ -68,7 +71,8 @@ final class WledDevice {
                 if (s == null) continue;
                 int id = s.optInt("id", i);
                 if (s.optInt("stop", 1) <= s.optInt("start", 0)) continue;
-                segments.add(new Segment(id, s.optString("n", ""), s.optBoolean("on", true)));
+                segments.add(new Segment(id, s.optString("n", ""), s.optBoolean("on", true),
+                        s.optInt("fx", 0), WledEffectColors.copy(s.optJSONArray("col"))));
             }
             JSONObject chosen = null;
             for (int i = 0; i < seg.length(); i++) {
@@ -102,6 +106,25 @@ final class WledDevice {
         }
     }
 
+    /** Metadata indexes are identical to WLED effects[] indexes. */
+    void applyEffectMetadata(JSONArray metadata) {
+        effectMetadata.clear();
+        for (int i = 0; i < metadata.length(); i++)
+            effectMetadata.add(metadata.optString(i, ""));
+        loadedEffectMetadata = true;
+        loadingEffectMetadata = false;
+    }
+
+    String metadataForEffect(int fx) {
+        if (!loadedEffectMetadata || fx < 0 || fx >= effectMetadata.size()) return null;
+        return effectMetadata.get(fx);
+    }
+
+    Segment segmentFor(int id) {
+        if (id >= 0) for (Segment s : segments) if (s.id == id) return s;
+        return segments.isEmpty() ? null : segments.get(0);
+    }
+
     void applyPresets(JSONObject data) {
         loadedPresets = true;
         loadingPresets = false;
@@ -118,7 +141,16 @@ final class WledDevice {
         final int id;
         final String name;
         final boolean on;
-        Segment(int id, String name, boolean on) { this.id = id; this.name = name; this.on = on; }
+        final int effect;
+        JSONArray colors;
+        Segment(int id, String name, boolean on) {
+            this(id, name, on, 0, new JSONArray());
+        }
+        Segment(int id, String name, boolean on, int effect, JSONArray colors) {
+            this.id = id; this.name = name; this.on = on;
+            this.effect = effect;
+            this.colors = colors;
+        }
         String label() { return name.isEmpty() ? "Segment " + (id + 1) : name; }
     }
 

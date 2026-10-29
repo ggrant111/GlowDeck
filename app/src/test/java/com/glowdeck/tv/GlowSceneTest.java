@@ -46,7 +46,8 @@ public class GlowSceneTest {
         GlowScene.Target edited = initial.withBrightness(200).withColor(0xFFAA11);
         assertEquals(200, edited.state.getInt("bri"));
         assertEquals(97, initial.state.getInt("bri"));
-        assertEquals("Solid", edited.state.getJSONArray("seg").getJSONObject(0).getString("fxName"));
+        assertEquals("Rainbow", edited.state.getJSONArray("seg").getJSONObject(0).getString("fxName"));
+        assertEquals(1, edited.state.getJSONArray("seg").getJSONObject(0).getInt("fx"));
         assertEquals(255, edited.state.getJSONArray("seg").getJSONObject(0).getJSONArray("col").getJSONArray(0).getInt(0));
     }
 
