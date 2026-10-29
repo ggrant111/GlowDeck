@@ -1,3 +1,19 @@
+# GlowDeck v1.6.2 — Command Status & WLED State Verification
+
+**New:** A persistent, nonblocking in-app status banner shows **Request queued → Request sent, checking WLED state → Confirmed / Not confirmed / Failed** when GlowDeck changes a light.
+
+Every command in the main WLED control panel, Favorites, WLED preset save, and multi-device scenes now independently checks each controller with `GET /json` after a successful `POST /json/state`; preset creation is verified via `GET /presets.json`. A successful HTTP POST is **not** enough to claim the change occurred. The app does not resend a command while verifying it. After four read attempts, an unmatched state is **not confirmed**, not falsely marked as successful or failed. Group and scene results distinguish confirmed/failed/unconfirmed/unsupported controllers.
+
+The notification does not steal Fire TV D-pad focus. It works on Fire TV, Android tablets, and phones, automatically disappearing after a successful confirmation (approximately 4 seconds) or after an unsuccessful verification (approximately 8 seconds).
+
+**Limits:** The API verifies the state **reported by WLED**, not the physical light output. Long fade transitions or changes made simultaneously by another client can still return **not confirmed**. This is a local-network feature and uses no cloud service or new account.
+
+v1.6.1's older Fire OS SeekBar startup compatibility fix remains included. Configurations and saved devices, Favorites, groups, and scenes are preserved during an in-place install with the same signing key.
+
+To build, use JDK 17 / SDK 35 and run `gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug`. Inspect the Actions run on GitHub to download the debug APK. Run the device checks in `docs/V1_6_2_COMMAND_FEEDBACK_TESTS.md`.
+
+---
+
 # GlowDeck v1.6.1 — Fire Tablet compatibility hotfix
 
 Version 1.6.1 (versionCode 9). Fixes a crash on older Fire OS devices caused by a call to unavailable `SeekBar.setMinHeight(int)` in `MainActivity.touchSeek`. Brightness, Speed, and Intensity sliders retain 48dp height from their existing layout parameters.

@@ -1,5 +1,14 @@
 # Change log
 
+## v1.6.2 — Verified WLED command status
+- Show immediate, nonblocking in-app notifications for queued, sent/awaiting verification, confirmed and not confirmed/failed commands.
+- After WLED state changes, read the device to verify requested power, brightness, effect, color, segment and preset state.
+- Read `/presets.json` to verify a preset save operation.
+- Cover main controls, Favorites, groups and multi-device scene activation; report partial confirmations.
+- Retry GET reads without resending mutations. Do not infer successful changes from HTTP acknowledgement alone.
+- Preserve the v1.6.1 Fire OS startup fix, existing WLED features and stored configurations.
+- Add unit tests and device acceptance checklist.
+
 ## v1.6.1 — Fire Tablet startup compatibility hotfix
 - Fix immediate launch crash on older Fire OS: remove unsupported `SeekBar.setMinHeight(int)` call from `MainActivity.touchSeek`.
 - Keep existing 48dp slider height via layout parameters; WLED controls otherwise unchanged.
